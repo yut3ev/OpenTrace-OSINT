@@ -18,8 +18,9 @@ from opentrace.storage.sqlite import SQLiteStorage
 
 
 @pytest.fixture(autouse=True)
-def setup_teardown() -> Generator[None, None, None]:
+def setup_teardown(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
     """Ensure clean global dependency states for every test."""
+    monkeypatch.setenv("OPENTRACE_STORAGE_MODE", "memory")
     reset_settings()
     reset_dependencies()
     yield

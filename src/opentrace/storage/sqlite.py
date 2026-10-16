@@ -86,7 +86,8 @@ class SQLiteStorage(StorageBackend):
                 )
             else:
                 cursor = conn.execute(
-                    "SELECT payload FROM investigations WHERE id = ?", (str(investigation_id),)
+                    "SELECT payload FROM investigations WHERE id = ? AND user_id IS NULL",
+                    (str(investigation_id),),
                 )
             row = cursor.fetchone()
             if row:
@@ -102,7 +103,8 @@ class SQLiteStorage(StorageBackend):
                 )
             else:
                 cursor = conn.execute(
-                    "SELECT payload FROM investigations ORDER BY created_at DESC LIMIT ?", (limit,)
+                    "SELECT payload FROM investigations WHERE user_id IS NULL ORDER BY created_at DESC LIMIT ?",
+                    (limit,),
                 )
             rows = cursor.fetchall()
             return [json.loads(r[0]) for r in rows]
@@ -116,7 +118,8 @@ class SQLiteStorage(StorageBackend):
                 )
             else:
                 cursor = conn.execute(
-                    "DELETE FROM investigations WHERE id = ?", (str(investigation_id),)
+                    "DELETE FROM investigations WHERE id = ? AND user_id IS NULL",
+                    (str(investigation_id),),
                 )
             conn.commit()
             return cursor.rowcount > 0

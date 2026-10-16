@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 class Settings:
     """Immutable application settings loaded from environment with canonical and alias names."""
 
-    storage_mode: str = "memory"
+    storage_mode: str = "sqlite"
     sqlite_path: str = "opentrace.db"
     max_concurrency: int = 5
     per_host_concurrency: int = 2
@@ -26,14 +26,17 @@ class Settings:
             "http://127.0.0.1:5173",
             "http://localhost:3000",
             "http://127.0.0.1:3000",
+            "https://opentrace.vercel.app",
         ]
     )
+    cors_origin_regex: str | None = None
     hibp_api_key: str | None = None
     numverify_api_key: str | None = None
     twilio_account_sid: str | None = None
     twilio_auth_token: str | None = None
 
     # Auth & Database Settings
+    require_auth: bool = False
     database_url: str | None = None
     jwt_secret: str = "opentrace-insecure-dev-secret-change-in-production"
     jwt_algorithm: str = "HS256"
@@ -48,7 +51,7 @@ def load_settings() -> Settings:
     """Load settings from OPENTRACE_* environment variables, supporting canonical and alias keys."""
     # Storage setting: supports canonical OPENTRACE_STORAGE_MODE and alias OPENTRACE_STORAGE
     storage_mode = (
-        os.getenv("OPENTRACE_STORAGE_MODE") or os.getenv("OPENTRACE_STORAGE") or "memory"
+        os.getenv("OPENTRACE_STORAGE_MODE") or os.getenv("OPENTRACE_STORAGE") or "sqlite"
     ).lower()
 
     # SQLite path
@@ -89,7 +92,9 @@ def load_settings() -> Settings:
             "http://127.0.0.1:5173",
             "http://localhost:3000",
             "http://127.0.0.1:3000",
+            "https://opentrace.vercel.app",
         ]
+    cors_origin_regex = os.getenv("OPENTRACE_CORS_ORIGIN_REGEX")
 
     # Authorized Provider Keys
     hibp_api_key = os.getenv("HIBP_API_KEY")
@@ -98,6 +103,8 @@ def load_settings() -> Settings:
     twilio_auth_token = os.getenv("TWILIO_AUTH_TOKEN")
 
     # Auth & Database Settings
+    require_auth_raw = os.getenv("OPENTRACE_REQUIRE_AUTH", "false").lower()
+    require_auth = require_auth_raw in ("1", "true", "yes", "on")
     database_url = os.getenv("DATABASE_URL") or os.getenv("OPENTRACE_DATABASE_URL")
     jwt_secret = (
         os.getenv("OPENTRACE_JWT_SECRET")
@@ -125,10 +132,12 @@ def load_settings() -> Settings:
         user_agent=user_agent,
         api_key=api_key,
         cors_origins=cors_origins,
+        cors_origin_regex=cors_origin_regex,
         hibp_api_key=hibp_api_key,
         numverify_api_key=numverify_api_key,
         twilio_account_sid=twilio_account_sid,
         twilio_auth_token=twilio_auth_token,
+        require_auth=require_auth,
         database_url=database_url,
         jwt_secret=jwt_secret,
         jwt_algorithm=jwt_algorithm,

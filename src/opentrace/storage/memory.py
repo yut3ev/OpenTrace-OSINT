@@ -40,8 +40,12 @@ class MemoryStorage(StorageBackend):
             item = self._storage.get(str(investigation_id))
             if not item:
                 return None
-            if user_id is not None and item.get("user_id") != user_id:
-                return None
+            if user_id is not None:
+                if item.get("user_id") != user_id:
+                    return None
+            else:
+                if item.get("user_id") is not None:
+                    return None
             return copy.deepcopy(item)
 
     async def list_investigations(
@@ -51,6 +55,8 @@ class MemoryStorage(StorageBackend):
             items = list(self._storage.values())
             if user_id is not None:
                 items = [item for item in items if item.get("user_id") == user_id]
+            else:
+                items = [item for item in items if item.get("user_id") is None]
             items.sort(key=lambda x: str(x.get("created_at", "")), reverse=True)
             return copy.deepcopy(items[:limit])
 
@@ -58,8 +64,12 @@ class MemoryStorage(StorageBackend):
         async with self._lock:
             key = str(investigation_id)
             if key in self._storage:
-                if user_id is not None and self._storage[key].get("user_id") != user_id:
-                    return False
+                if user_id is not None:
+                    if self._storage[key].get("user_id") != user_id:
+                        return False
+                else:
+                    if self._storage[key].get("user_id") is not None:
+                        return False
                 del self._storage[key]
                 return True
             return False

@@ -3,10 +3,6 @@
   "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/api/:match*",
-      "destination": "https://opentrace-api.onrender.com/api/:match*"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

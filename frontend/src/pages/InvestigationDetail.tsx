@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ArrowLeft, Clock, Download, RefreshCw, XCircle } from "lucide-react";
 import { FindingsList } from "../components/FindingsList";
-import { api } from "../api/client";
+import { api, getExportUrl } from "../api/client";
 import type { Investigation } from "../types";
 
 interface InvestigationDetailProps {
@@ -19,7 +19,6 @@ export function InvestigationDetail({
   const [retrying, setRetrying] = useState(false);
   const [cancelledLocally, setCancelledLocally] = useState(false);
   const [currentInv, setCurrentInv] = useState<Investigation>(investigation);
-  const exportBase = `/api/v1/investigations/${encodeURIComponent(currentInv.id)}/export`;
 
   async function handleCancel() {
     setCancelling(true);
@@ -115,15 +114,15 @@ export function InvestigationDetail({
             </button>
           )}
 
-          <a className="ghost" href={`${exportBase}?format=json`} download>
+          <a className="ghost" href={getExportUrl(currentInv.id, "json")} download>
             <Download size={14} /> JSON
           </a>
-          <a className="ghost" href={`${exportBase}?format=csv`} download>
+          <a className="ghost" href={getExportUrl(currentInv.id, "csv")} download>
             <Download size={14} /> CSV
           </a>
           <a
             className="ghost"
-            href={`${exportBase}?format=html`}
+            href={getExportUrl(currentInv.id, "html")}
             download
             target="_blank"
             rel="noreferrer"

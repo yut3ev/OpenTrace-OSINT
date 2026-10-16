@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -41,15 +42,25 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     # CORS configuration
-    configured_origins = settings.cors_origins
-    allow_credentials = "*" not in configured_origins
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=configured_origins if configured_origins else ["*"],
-        allow_credentials=allow_credentials,
-        allow_methods=["*"],
-        allow_headers=["*"],
+    has_wildcard = "*" in settings.cors_origins
+    valid_origins = [o for o in settings.cors_origins if o != "*"]
+    allow_origins = (
+        ["*"]
+        if (has_wildcard and not valid_origins)
+        else (valid_origins or ["http://localhost:5173"])
     )
+    allow_credentials = not has_wildcard
+
+    cors_kwargs: dict[str, Any] = {
+        "allow_origins": allow_origins,
+        "allow_credentials": allow_credentials,
+        "allow_methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        "allow_headers": ["Authorization", "Content-Type", "X-API-Key", "X-Request-ID", "Accept"],
+    }
+    if settings.cors_origin_regex:
+        cors_kwargs["allow_origin_regex"] = settings.cors_origin_regex
+
+    app.add_middleware(CORSMiddleware, **cors_kwargs)
 
     # API key authentication middleware
     @app.middleware("http")

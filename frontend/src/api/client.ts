@@ -8,7 +8,8 @@ import type {
   User,
 } from "../types";
 
-const base = "/api/v1";
+export const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
+export const API_PREFIX = `${API_BASE}/api/v1`;
 
 const TOKEN_KEY = "opentrace_auth_token";
 
@@ -20,6 +21,12 @@ export const authStorage = {
   },
 };
 
+export function getExportUrl(investigationId: string, format: string): string {
+  const token = authStorage.getToken();
+  const tokenParam = token ? `&token=${encodeURIComponent(token)}` : "";
+  return `${API_PREFIX}/investigations/${encodeURIComponent(investigationId)}/export?format=${format}${tokenParam}`;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = authStorage.getToken();
   const headers: Record<string, string> = {
@@ -30,7 +37,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${base}${path}`, {
+  const response = await fetch(`${API_PREFIX}${path}`, {
     ...init,
     headers,
   });

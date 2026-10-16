@@ -6,7 +6,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Response
 
-from opentrace.api.dependencies import get_optional_user, get_storage
+from opentrace.api.dependencies import get_export_user, get_storage
 from opentrace.core.errors import ExportError, InvestigationNotFoundError
 from opentrace.reports.csv_report import export_csv
 from opentrace.reports.html_report import export_html
@@ -21,7 +21,7 @@ async def export_investigation(
     investigation_id: str,
     storage: Annotated[StorageBackend, Depends(get_storage)],
     format: Annotated[str, Query(pattern="^(json|csv|html)$")] = "json",
-    user: Annotated[dict[str, Any] | None, Depends(get_optional_user)] = None,
+    user: Annotated[dict[str, Any] | None, Depends(get_export_user)] = None,
 ) -> Response:
     """Export investigation findings as JSON, CSV, or HTML with ownership verification."""
     user_id = user["id"] if user else None

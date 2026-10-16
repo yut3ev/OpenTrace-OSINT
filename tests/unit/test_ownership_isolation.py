@@ -84,3 +84,49 @@ async def test_cross_user_isolation_and_anti_enumeration() -> None:
         get_a = await client.get(f"/api/v1/investigations/{inv_id_a}", headers=headers_a)
         assert get_a.status_code == 200
         assert get_a.json()["id"] == inv_id_a
+
+        # Unauthenticated caller attempts to fetch, list, export, or delete User A's investigation -> gets 404
+        get_unauth = await client.get(f"/api/v1/investigations/{inv_id_a}")
+        assert get_unauth.status_code == 404
+
+        list_unauth = await client.get("/api/v1/investigations")
+        assert list_unauth.status_code == 200
+        assert not any(item["id"] == inv_id_a for item in list_unauth.json())
+
+        export_unauth = await client.get(f"/api/v1/investigations/{inv_id_a}/export?format=json")
+        assert export_unauth.status_code == 404
+
+        del_unauth = await client.delete(f"/api/v1/investigations/{inv_id_a}")
+        assert del_unauth.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_require_auth_enforcement(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When OPENTRACE_REQUIRE_AUTH is true, all unauthenticated investigation actions return 401."""
+    monkeypatch.setenv("OPENTRACE_REQUIRE_AUTH", "true")
+    reset_dependencies()
+    storage = MemoryStorage()
+    app = create_app()
+    app.dependency_overrides[get_storage] = lambda: storage
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # Create unauth -> 401
+        res = await client.post("/api/v1/investigations", json={"username": "testuser"})
+        assert res.status_code == 401
+
+        # List unauth -> 401
+        res = await client.get("/api/v1/investigations")
+        assert res.status_code == 401
+
+        # Get unauth -> 401
+        res = await client.get("/api/v1/investigations/non-existent-uuid")
+        assert res.status_code == 401
+
+        # Delete unauth -> 401
+        res = await client.delete("/api/v1/investigations/non-existent-uuid")
+        assert res.status_code == 401
+
+        # Export unauth -> 401
+        res = await client.get("/api/v1/investigations/non-existent-uuid/export")
+        assert res.status_code == 401
+

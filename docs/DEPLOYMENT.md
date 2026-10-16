@@ -19,8 +19,8 @@ This guide details instructions for installing, configuring, running, and deploy
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/opentrace.git
-cd opentrace
+git clone https://github.com/yut3ev/OpenTrace-OSINT.git
+cd OpenTrace-OSINT
 
 # Create and activate virtual environment
 python -m venv .venv
@@ -98,17 +98,25 @@ npm run dev
 
 OpenTrace is configured via standard environment variables or a `.env` file at the repository root:
 
-| Variable | Default Value | Description |
-|---|---|---|
-| `OPENTRACE_STORAGE_MODE` | `memory` | Storage backend (`memory` or `sqlite`). |
-| `OPENTRACE_SQLITE_PATH` | `opentrace.db` | File path for SQLite database when mode is `sqlite`. |
-| `OPENTRACE_MAX_CONCURRENCY` | `10` | Global maximum concurrent HTTP/DNS tasks. |
-| `OPENTRACE_PER_HOST_CONCURRENCY` | `2` | Per-domain concurrent connection limiter. |
-| `OPENTRACE_MAX_RUNTIME` | `45` | Global timeout limit per investigation in seconds. |
-| `OPENTRACE_LOG_LEVEL` | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`). |
-| `OPENTRACE_USER_AGENT` | `OpenTrace-OSINT/0.1.0` | Default User-Agent header for public requests. |
-| `HIBP_API_KEY` | *(optional)* | Authorized API key for HaveIBeenPwned lookup adapter. |
-| `NUMVERIFY_API_KEY` | *(optional)* | Authorized API key for Numverify phone provider adapter. |
+| Variable | Alias | Default Value | Description |
+|---|---|---|---|
+| `OPENTRACE_STORAGE_MODE` | `OPENTRACE_STORAGE` | `sqlite` | Storage backend (`sqlite` for persistent, `memory` for volatile). |
+| `OPENTRACE_SQLITE_PATH` | - | `opentrace.db` | File path for SQLite database when mode is `sqlite`. |
+| `OPENTRACE_REQUIRE_AUTH` | - | `true` | Enforces authentication on investigation creation and exports. |
+| `OPENTRACE_MAX_CONCURRENCY` | - | `5` | Global maximum concurrent HTTP/DNS tasks. |
+| `OPENTRACE_PER_HOST_CONCURRENCY` | - | `2` | Per-domain concurrent connection limiter. |
+| `OPENTRACE_DEFAULT_TIMEOUT` | `OPENTRACE_REQUEST_TIMEOUT_SECONDS` | `10.0` | Default HTTP timeout per module request in seconds. |
+| `OPENTRACE_MAX_RUNTIME` | `OPENTRACE_MAX_RUNTIME_SECONDS` | `60.0` | Global timeout limit per investigation in seconds. |
+| `OPENTRACE_CORS_ORIGINS` | - | `http://localhost:5173,...` | Comma-separated allowed frontend origins. |
+| `OPENTRACE_CORS_ORIGIN_REGEX` | - | *(optional)* | Regular expression for dynamic CORS domains (e.g. `^https:\/\/.*\.vercel\.app$`). |
+| `OPENTRACE_JWT_SECRET` | `JWT_SECRET` | *(dev default)* | High-entropy random secret for signing session JWT tokens. |
+| `OPENTRACE_ACCESS_TOKEN_EXPIRE_MINUTES` | - | `10080` | JWT expiration duration in minutes (default 7 days). |
+| `OPENTRACE_LOG_LEVEL` | - | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`). |
+| `OPENTRACE_USER_AGENT` | - | `OpenTrace/0.1 (...)` | Default User-Agent header for public requests. |
+| `HIBP_API_KEY` | - | *(optional)* | Authorized API key for HaveIBeenPwned lookup adapter. |
+| `NUMVERIFY_API_KEY` | - | *(optional)* | Authorized API key for Numverify phone provider adapter. |
+| `TWILIO_ACCOUNT_SID` | - | *(optional)* | Twilio account SID for authorized carrier lookups. |
+| `TWILIO_AUTH_TOKEN` | - | *(optional)* | Twilio authentication token for carrier lookups. |
 
 ---
 
@@ -194,11 +202,11 @@ cd frontend && npm run lint && npm run build
 OpenTrace is architected specifically for zero-cost operation on public free tiers:
 
 ### A. Frontend Deployment on Vercel
-1. Import repository on [Vercel](https://vercel.com).
-2. Root directory is automatically handled by the top-level `vercel.json` (or set Root Directory to `frontend`).
-3. Set Environment Variable:
-   - `VITE_API_BASE_URL`: `https://opentrace-api.onrender.com` (your backend URL)
-4. Deploy: Vercel compiles React TypeScript static assets and caches them across its global edge network.
+1. Import your repository on [Vercel](https://vercel.com).
+2. Set **Root Directory** to `frontend` (or leave at root; `vercel.json` compiles the dashboard).
+3. In **Project Settings > Environment Variables**, add:
+   - `VITE_API_BASE_URL`: The public URL of your backend (e.g. `https://your-opentrace-api.onrender.com` without trailing slash).
+4. Click **Deploy**. Vercel compiles the React/TypeScript bundle with SPA routing via `vercel.json`.
 
 ### B. Backend Deployment on Render.com
 1. Create a free account on [Render](https://render.com).
@@ -206,15 +214,21 @@ OpenTrace is architected specifically for zero-cost operation on public free tie
 3. Select `render.yaml` in the repository root.
 4. Render provisions:
    - `opentrace-api`: Python 3.12 Web Service on Free plan (512 MB RAM).
-   - `opentrace-data`: 1 GB persistent SQLite volume attached to `/data/opentrace.db`.
-5. Automatic cold-start handling: SQLite automatically runs migrations on startup (`src/opentrace/storage/migrations/runner.py`) in under 50ms.
+   - `opentrace-data`: 1 GB persistent SQLite disk volume attached to `/data/opentrace.db`.
+5. Configure your backend Environment Variables on Render:
+   - `OPENTRACE_STORAGE_MODE=sqlite`
+   - `OPENTRACE_SQLITE_PATH=/data/opentrace.db`
+   - `OPENTRACE_REQUIRE_AUTH=true`
+   - `OPENTRACE_CORS_ORIGINS=https://your-frontend.vercel.app,http://localhost:5173`
+   - `OPENTRACE_JWT_SECRET=<YOUR-SECURE-RANDOM-SECRET>`
+6. **Storage & Persistence Architecture:** SQLite requires a persistent filesystem volume (such as Render Disk or Railway Volume). On ephemeral serverless runtimes (e.g. AWS Lambda without EFS or Vercel Serverless Functions), local disk state resets between invocations. For reliable persistence across restarts, always mount a persistent disk volume or configure an external PostgreSQL database (`DATABASE_URL`).
 
 ### C. Railway / Fly.io Alternative
-- **Railway:** Deploy directly using the provided `Dockerfile` and `docker-compose.yml`.
-- **Fly.io:** Run `fly launch` using `fly.toml` with `min_machines_running = 0` to sleep when idle and wake on request.
+- **Railway:** Deploy directly using the provided `Dockerfile` and `docker-compose.yml` with a persistent volume.
+- **Fly.io:** Run `fly launch` using `fly.toml` with persistent storage volume mounted at `/data`.
 
 ### D. Zero-Cost Free-Tier Architectural Guarantees
-- **Total API cost:** \$0 (149 active adapters run without requiring paid API keys).
+- **Total API cost:** $0 (149 active adapters run without requiring paid API keys).
 - **RAM Footprint:** ~85 MB resident memory during active search (well within 512 MB free-tier limits).
 - **Graceful Concurrency:** Semaphores cap concurrency to prevent memory spikes.
 
