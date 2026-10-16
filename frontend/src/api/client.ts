@@ -21,11 +21,6 @@ export const authStorage = {
   },
 };
 
-export function getExportUrl(investigationId: string, format: string): string {
-  const token = authStorage.getToken();
-  const tokenParam = token ? `&token=${encodeURIComponent(token)}` : "";
-  return `${API_PREFIX}/investigations/${encodeURIComponent(investigationId)}/export?format=${format}${tokenParam}`;
-}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = authStorage.getToken();
@@ -89,6 +84,33 @@ export const api = {
     request<{ deleted: boolean }>(`/investigations/${encodeURIComponent(id)}`, {
       method: "DELETE",
     }),
+  exportInvestigation: async (
+    id: string,
+    format: "json" | "csv" | "html"
+  ): Promise<void> => {
+    const token = authStorage.getToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    const response = await fetch(
+      `${API_PREFIX}/investigations/${encodeURIComponent(id)}/export?format=${format}`,
+      { headers }
+    );
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body?.error?.message ?? body?.detail ?? `Export failed (${response.status})`);
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `opentrace-${id}.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  },
 
   // User Authentication & Account
   auth: {

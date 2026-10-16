@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ArrowLeft, Clock, Download, RefreshCw, XCircle } from "lucide-react";
 import { FindingsList } from "../components/FindingsList";
-import { api, getExportUrl } from "../api/client";
+import { api } from "../api/client";
 import type { Investigation } from "../types";
 
 interface InvestigationDetailProps {
@@ -18,7 +18,20 @@ export function InvestigationDetail({
   const [cancelling, setCancelling] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [cancelledLocally, setCancelledLocally] = useState(false);
+  const [exporting, setExporting] = useState<string | null>(null);
   const [currentInv, setCurrentInv] = useState<Investigation>(investigation);
+
+  async function handleExport(format: "json" | "csv" | "html") {
+    setExporting(format);
+    try {
+      await api.exportInvestigation(currentInv.id, format);
+    } catch (e) {
+      console.error("Export failed:", e);
+      alert(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting(null);
+    }
+  }
 
   async function handleCancel() {
     setCancelling(true);
@@ -114,21 +127,30 @@ export function InvestigationDetail({
             </button>
           )}
 
-          <a className="ghost" href={getExportUrl(currentInv.id, "json")} download>
-            <Download size={14} /> JSON
-          </a>
-          <a className="ghost" href={getExportUrl(currentInv.id, "csv")} download>
-            <Download size={14} /> CSV
-          </a>
-          <a
+          <button
             className="ghost"
-            href={getExportUrl(currentInv.id, "html")}
-            download
-            target="_blank"
-            rel="noreferrer"
+            onClick={() => handleExport("json")}
+            disabled={exporting !== null}
+            title="Download JSON Report"
           >
-            <Download size={14} /> HTML
-          </a>
+            <Download size={14} /> {exporting === "json" ? "Exporting…" : "JSON"}
+          </button>
+          <button
+            className="ghost"
+            onClick={() => handleExport("csv")}
+            disabled={exporting !== null}
+            title="Download CSV Report"
+          >
+            <Download size={14} /> {exporting === "csv" ? "Exporting…" : "CSV"}
+          </button>
+          <button
+            className="ghost"
+            onClick={() => handleExport("html")}
+            disabled={exporting !== null}
+            title="Download Standalone HTML Report"
+          >
+            <Download size={14} /> {exporting === "html" ? "Exporting…" : "HTML"}
+          </button>
         </div>
       </div>
 

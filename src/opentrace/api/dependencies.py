@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import Depends, HTTPException, Query, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from opentrace.config import Settings, get_settings
@@ -139,21 +139,9 @@ async def get_export_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
     storage: Annotated[StorageBackend, Depends(get_storage)],
     settings: Annotated[Settings, Depends(get_app_settings)],
-    token: Annotated[str | None, Query()] = None,
 ) -> dict[str, Any] | None:
-    """Validate user credentials for file downloads (supporting Bearer header and ?token= query parameter)."""
+    """Validate user credentials for file downloads strictly via Authorization header."""
     user = await get_optional_user(credentials, storage)
-    if not user and token:
-        try:
-            payload = decode_access_token(token)
-            user_id = payload.get("sub")
-            if user_id:
-                candidate = await storage.get_user_by_id(str(user_id))
-                if candidate and candidate.get("is_active", True):
-                    user = candidate
-        except Exception:
-            user = None
-
     if settings.require_auth and not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

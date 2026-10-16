@@ -77,27 +77,42 @@ async def test_cross_user_isolation_and_anti_enumeration() -> None:
         assert retry_b.status_code == 404
 
         # User B attempts to stream events from User A's investigation -> gets 404
-        stream_b = await client.get(f"/api/v1/investigations/{inv_id_a}/events", headers=headers_b)
-        assert stream_b.status_code == 404
+        # User B attempts to access findings -> gets 404
+        findings_b = await client.get(
+            f"/api/v1/investigations/{inv_id_a}/findings", headers=headers_b
+        )
+        assert findings_b.status_code == 404
+
+        # User B attempts to access source breakdown -> gets 404
+        sources_b = await client.get(
+            f"/api/v1/investigations/{inv_id_a}/sources", headers=headers_b
+        )
+        assert sources_b.status_code == 404
+
+        # User B attempts to cancel User A's investigation -> gets 404
+        cancel_b = await client.post(f"/api/v1/investigations/{inv_id_a}/cancel", headers=headers_b)
+        assert cancel_b.status_code == 404
 
         # Verify User A's investigation is still intact and accessible by User A
         get_a = await client.get(f"/api/v1/investigations/{inv_id_a}", headers=headers_a)
         assert get_a.status_code == 200
         assert get_a.json()["id"] == inv_id_a
 
-        # Unauthenticated caller attempts to fetch, list, export, or delete User A's investigation -> gets 404
-        get_unauth = await client.get(f"/api/v1/investigations/{inv_id_a}")
-        assert get_unauth.status_code == 404
+        # Unauthenticated caller attempts to fetch, list, export, delete, cancel, or stream User A's investigation -> gets 404
+        assert (await client.get(f"/api/v1/investigations/{inv_id_a}")).status_code == 404
+        assert (await client.delete(f"/api/v1/investigations/{inv_id_a}")).status_code == 404
+        assert (
+            await client.get(f"/api/v1/investigations/{inv_id_a}/export?format=json")
+        ).status_code == 404
+        assert (await client.get(f"/api/v1/investigations/{inv_id_a}/findings")).status_code == 404
+        assert (await client.get(f"/api/v1/investigations/{inv_id_a}/sources")).status_code == 404
+        assert (await client.post(f"/api/v1/investigations/{inv_id_a}/cancel")).status_code == 404
+        assert (await client.post(f"/api/v1/investigations/{inv_id_a}/retry")).status_code == 404
+        assert (await client.get(f"/api/v1/investigations/{inv_id_a}/events")).status_code == 404
 
         list_unauth = await client.get("/api/v1/investigations")
         assert list_unauth.status_code == 200
         assert not any(item["id"] == inv_id_a for item in list_unauth.json())
-
-        export_unauth = await client.get(f"/api/v1/investigations/{inv_id_a}/export?format=json")
-        assert export_unauth.status_code == 404
-
-        del_unauth = await client.delete(f"/api/v1/investigations/{inv_id_a}")
-        assert del_unauth.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -129,3 +144,64 @@ async def test_require_auth_enforcement(monkeypatch: pytest.MonkeyPatch) -> None
         # Export unauth -> 401
         res = await client.get("/api/v1/investigations/non-existent-uuid/export")
         assert res.status_code == 401
+
+        # Cancel unauth -> 401
+        res = await client.post("/api/v1/investigations/non-existent-uuid/cancel")
+        assert res.status_code == 401
+
+        # Retry unauth -> 401
+        res = await client.post("/api/v1/investigations/non-existent-uuid/retry")
+        assert res.status_code == 401
+
+        # Events unauth -> 401
+        res = await client.get("/api/v1/investigations/non-existent-uuid/events")
+        assert res.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_token_cryptographic_verification(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify that forged, malformed, or expired JWT tokens are rejected."""
+    monkeypatch.setenv("OPENTRACE_REQUIRE_AUTH", "true")
+    reset_dependencies()
+    storage = MemoryStorage()
+    app = create_app()
+    app.dependency_overrides[get_storage] = lambda: storage
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # 1. Malformed token
+        res_malformed = await client.get(
+            "/api/v1/investigations", headers={"Authorization": "Bearer not-a-valid-jwt"}
+        )
+        assert res_malformed.status_code == 401
+
+        # 2. Forged token signed with a different key
+        import jwt
+
+        forged_payload = {
+            "sub": "non-existent-user",
+            "email": "attacker@evil.com",
+            "role": "admin",
+            "exp": 9999999999,
+        }
+        forged_token = jwt.encode(
+            forged_payload, "completely-wrong-secret-key-32bytes!", algorithm="HS256"
+        )
+        res_forged = await client.get(
+            "/api/v1/investigations", headers={"Authorization": f"Bearer {forged_token}"}
+        )
+        assert res_forged.status_code == 401
+
+        # 3. Expired token
+        expired_payload = {
+            "sub": "some-user-id",
+            "email": "user@example.com",
+            "role": "user",
+            "exp": 1000000000,  # Far in the past (Year 2001)
+        }
+        from opentrace.config import get_settings
+
+        expired_token = jwt.encode(expired_payload, get_settings().jwt_secret, algorithm="HS256")
+        res_expired = await client.get(
+            "/api/v1/investigations", headers={"Authorization": f"Bearer {expired_token}"}
+        )
+        assert res_expired.status_code == 401

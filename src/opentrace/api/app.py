@@ -58,6 +58,15 @@ def create_app() -> FastAPI:
         "allow_headers": ["Authorization", "Content-Type", "X-API-Key", "X-Request-ID", "Accept"],
     }
     if settings.cors_origin_regex:
+        dangerous_patterns = [r".*\.vercel\.app", r".*\.netlify\.app", r".*\.pages\.dev"]
+        if any(p in settings.cors_origin_regex for p in dangerous_patterns):
+            import logging
+
+            logging.getLogger("opentrace.api").warning(
+                "Overly broad CORS regex detected: %s. Disabling allow_credentials for security.",
+                settings.cors_origin_regex,
+            )
+            cors_kwargs["allow_credentials"] = False
         cors_kwargs["allow_origin_regex"] = settings.cors_origin_regex
 
     app.add_middleware(CORSMiddleware, **cors_kwargs)
