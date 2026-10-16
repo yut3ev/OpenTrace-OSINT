@@ -129,4 +129,3 @@ async def test_require_auth_enforcement(monkeypatch: pytest.MonkeyPatch) -> None
         # Export unauth -> 401
         res = await client.get("/api/v1/investigations/non-existent-uuid/export")
         assert res.status_code == 401
-
