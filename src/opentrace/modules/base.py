@@ -1,4 +1,4 @@
-"""Base definitions and interfaces for OSINT modules."""
+"""Base definitions and interfaces for OSINT modules and source adapters."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from opentrace.api.schemas.common import TargetType
 
 @dataclass
 class ModuleMetadata:
-    """Metadata describing an OSINT module's identity and capabilities."""
+    """Metadata describing an OSINT module's identity, capabilities, and operational limits."""
 
     id: str
     name: str
@@ -21,7 +21,11 @@ class ModuleMetadata:
     source_url: str
     description: str
     enabled: bool = True
-    implementation_status: str = "implemented"  # implemented, planned, disabled
+    implementation_status: str = "implemented"  # implemented, tested, requires_api_key, requires_oauth, public_web, temporarily_unavailable, planned
+    category: str = (
+        "general"  # developer, social, blogging, creative, gaming, messaging, email, phone, people
+    )
+    access_type: str = "public_web"  # public_web, public_api, requires_api_key, local_analysis
     limitations: list[str] = field(default_factory=list)
     timeout: float = 10.0
     max_requests: int = 5
@@ -29,7 +33,7 @@ class ModuleMetadata:
 
 
 class OSINTModule(abc.ABC):
-    """Abstract base class for all OSINT collection modules."""
+    """Abstract base class for all OSINT collection modules and source adapters."""
 
     @property
     @abc.abstractmethod
@@ -41,7 +45,7 @@ class OSINTModule(abc.ABC):
     async def run(self, target: str, context: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         """Execute the module against a normalized target identifier.
 
-        Returns a list of raw finding dictionaries.
+        Returns a list of raw finding dictionaries conforming to FindingSchema.
         """
         ...
 

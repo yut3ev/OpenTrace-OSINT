@@ -22,6 +22,7 @@ class EventType(StrEnum):
     module_completed = "module.completed"
     module_failed = "module.failed"
     investigation_completed = "investigation.completed"
+    investigation_cancelled = "investigation.cancelled"
 
 
 @dataclass

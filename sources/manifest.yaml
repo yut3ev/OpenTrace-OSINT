@@ -1,0 +1,611 @@
+# OpenTrace OSINT — Source Registry Manifest
+# Describes all supported, implemented, tested, and planned source adapters.
+
+version: "1.0.0"
+updated_at: "2026-10-16"
+
+sources:
+  # ============================================================================
+  # USERNAME SEARCH: Developer & Code Platforms
+  # ============================================================================
+  - id: "username.github"
+    name: "GitHub"
+    category: "developer"
+    target_type: "username"
+    access_type: "public_api"
+    source_url: "https://github.com/{username}"
+    api_url: "https://api.github.com/users/{username}"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "Public developer profile, repositories, bio, and creation timestamp."
+    limitations: ["Unauthenticated rate limit 60 req/hr per IP", "Profile existence is not identity proof"]
+
+  - id: "username.gitlab"
+    name: "GitLab"
+    category: "developer"
+    target_type: "username"
+    access_type: "public_api"
+    source_url: "https://gitlab.com/{username}"
+    api_url: "https://gitlab.com/api/v4/users?username={username}"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "Public GitLab profile, name, state, and web URL."
+    limitations: ["IP rate limits apply", "Soft-404 handling required"]
+
+  - id: "username.bitbucket"
+    name: "Bitbucket"
+    category: "developer"
+    target_type: "username"
+    access_type: "public_api"
+    source_url: "https://bitbucket.org/{username}/"
+    api_url: "https://api.bitbucket.org/2.0/users/{username}"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "Bitbucket public account verification and display name."
+    limitations: ["Account visibility settings may restrict details"]
+
+  - id: "username.dockerhub"
+    name: "Docker Hub"
+    category: "developer"
+    target_type: "username"
+    access_type: "public_api"
+    source_url: "https://hub.docker.com/u/{username}"
+    api_url: "https://hub.docker.com/v2/users/{username}"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "Docker Hub container publisher profile and public namespace."
+    limitations: ["Does not list private repositories"]
+
+  - id: "username.pypi"
+    name: "PyPI"
+    category: "developer"
+    target_type: "username"
+    access_type: "public_web"
+    source_url: "https://pypi.org/user/{username}/"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "Python Package Index maintainer/author profile page."
+    limitations: ["HTML profile inspection with 404 validation"]
+
+  - id: "username.npm"
+    name: "npm"
+    category: "developer"
+    target_type: "username"
+    access_type: "public_web"
+    source_url: "https://www.npmjs.com/~{username}"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "Node Package Manager publisher and contributor public page."
+    limitations: ["Requires strict non-200 / 404 detection"]
+
+  - id: "username.huggingface"
+    name: "Hugging Face"
+    category: "developer"
+    target_type: "username"
+    access_type: "public_api"
+    source_url: "https://huggingface.co/{username}"
+    api_url: "https://huggingface.co/api/users/{username}/overview"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "AI/ML developer models, datasets, spaces, and user bio."
+    limitations: ["Public models only"]
+
+  - id: "username.kaggle"
+    name: "Kaggle"
+    category: "developer"
+    target_type: "username"
+    access_type: "public_web"
+    source_url: "https://www.kaggle.com/{username}"
+    status: "planned"
+    capabilities: ["public_web"]
+    description: "Data science and competitive ML user profile."
+    limitations: ["Client-side rendered React page; status code verification"]
+
+  - id: "username.replit"
+    name: "Replit"
+    category: "developer"
+    target_type: "username"
+    access_type: "public_web"
+    source_url: "https://replit.com/@{username}"
+    status: "planned"
+    capabilities: ["public_web"]
+    description: "Interactive coding and application hosting user profile."
+    limitations: ["Cloudflare challenge on high frequency"]
+
+  - id: "username.codeberg"
+    name: "Codeberg"
+    category: "developer"
+    target_type: "username"
+    access_type: "public_api"
+    source_url: "https://codeberg.org/{username}"
+    api_url: "https://codeberg.org/api/v1/users/{username}"
+    status: "planned"
+    capabilities: ["public_web"]
+    description: "Forgejo-based open-source git forge user profile."
+    limitations: ["Strict rate limits on rapid lookups"]
+
+  - id: "username.devto"
+    name: "Dev.to"
+    category: "blogging"
+    target_type: "username"
+    access_type: "public_api"
+    source_url: "https://dev.to/{username}"
+    api_url: "https://dev.to/api/users/by_username?url={username}"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "Software developer community articles, bio, and profile."
+    limitations: ["Requires valid alphanumeric username"]
+
+  - id: "username.hashnode"
+    name: "Hashnode"
+    category: "blogging"
+    target_type: "username"
+    access_type: "public_web"
+    source_url: "https://hashnode.com/@{username}"
+    status: "planned"
+    capabilities: ["public_web"]
+    description: "Developer blogging platform profile."
+    limitations: ["SPA with specific 404 page verification"]
+
+  # ============================================================================
+  # USERNAME SEARCH: Social, Microblogging & Messaging
+  # ============================================================================
+  - id: "username.mastodon"
+    name: "Mastodon (social)"
+    category: "social"
+    target_type: "username"
+    access_type: "public_api"
+    source_url: "https://mastodon.social/@{username}"
+    api_url: "https://mastodon.social/api/v1/accounts/lookup?acct={username}"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "Decentralized ActivityPub flagship server user lookup."
+    limitations: ["Limited to mastodon.social instance"]
+
+  - id: "username.bluesky"
+    name: "Bluesky"
+    category: "social"
+    target_type: "username"
+    access_type: "public_api"
+    source_url: "https://bsky.app/profile/{username}.bsky.social"
+    api_url: "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={username}.bsky.social"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "AT Protocol public profile, display name, handle, and bio."
+    limitations: ["Checks standard .bsky.social handle suffix"]
+
+  - id: "username.reddit"
+    name: "Reddit"
+    category: "social"
+    target_type: "username"
+    access_type: "public_api"
+    source_url: "https://www.reddit.com/user/{username}"
+    api_url: "https://www.reddit.com/user/{username}/about.json"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "Reddit public user karma, account creation date, and verified email flag."
+    limitations: ["Strict User-Agent check and rate limit"]
+
+  - id: "username.telegram"
+    name: "Telegram (public)"
+    category: "messaging"
+    target_type: "username"
+    access_type: "public_web"
+    source_url: "https://t.me/{username}"
+    status: "planned"
+    capabilities: ["public_web"]
+    description: "Public Telegram channel, bot, or public preview handle."
+    limitations: ["Checks t.me web preview; does not access private chat"]
+
+  - id: "username.keybase"
+    name: "Keybase"
+    category: "social"
+    target_type: "username"
+    access_type: "public_api"
+    source_url: "https://keybase.io/{username}"
+    api_url: "https://keybase.io/_/api/1.0/user/lookup.json?usernames={username}"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "Cryptographic identity proofs, PGP fingerprints, and connected handles."
+    limitations: ["Public proofs only"]
+
+  - id: "username.linktree"
+    name: "Linktree"
+    category: "social"
+    target_type: "username"
+    access_type: "public_web"
+    source_url: "https://linktr.ee/{username}"
+    status: "planned"
+    capabilities: ["public_web"]
+    description: "Bio link hub aggregator public profile."
+    limitations: ["Detects deleted and unregistered profiles"]
+
+  - id: "username.medium"
+    name: "Medium"
+    category: "blogging"
+    target_type: "username"
+    access_type: "public_web"
+    source_url: "https://medium.com/@{username}"
+    status: "planned"
+    capabilities: ["public_web"]
+    description: "Publishing platform author profile and publication history."
+    limitations: ["Paywalled articles not indexed"]
+
+  - id: "username.substack"
+    name: "Substack"
+    category: "blogging"
+    target_type: "username"
+    access_type: "public_web"
+    source_url: "https://{username}.substack.com"
+    status: "planned"
+    capabilities: ["public_web"]
+    description: "Substack author newsletter domain and landing page."
+    limitations: ["Checks subdomain existence and 404 redirects"]
+
+  # ============================================================================
+  # USERNAME SEARCH: Creative, Design & Audio
+  # ============================================================================
+  - id: "username.behance"
+    name: "Behance"
+    category: "creative"
+    target_type: "username"
+    access_type: "public_web"
+    source_url: "https://www.behance.net/{username}"
+    status: "planned"
+    capabilities: ["public_web"]
+    description: "Adobe creative portfolio and design showcase."
+    limitations: ["Bot detection on high request volumes"]
+
+  - id: "username.dribbble"
+    name: "Dribbble"
+    category: "creative"
+    target_type: "username"
+    access_type: "public_web"
+    source_url: "https://dribbble.com/{username}"
+    status: "planned"
+    capabilities: ["public_web"]
+    description: "Design community designer shots and bio."
+    limitations: ["Handles pro/freelance redirects"]
+
+  - id: "username.artstation"
+    name: "ArtStation"
+    category: "creative"
+    target_type: "username"
+    access_type: "public_web"
+    source_url: "https://www.artstation.com/{username}"
+    status: "planned"
+    capabilities: ["public_web"]
+    description: "Digital artist portfolio and creative profile."
+    limitations: ["Cloudflare challenge mitigation"]
+
+  - id: "username.soundcloud"
+    name: "SoundCloud"
+    category: "creative"
+    target_type: "username"
+    access_type: "public_web"
+    source_url: "https://soundcloud.com/{username}"
+    status: "planned"
+    capabilities: ["public_web"]
+    description: "Audio streaming and music producer public profile."
+    limitations: ["Detects redirected user not found pages"]
+
+  - id: "username.bandcamp"
+    name: "Bandcamp"
+    category: "creative"
+    target_type: "username"
+    access_type: "public_web"
+    source_url: "https://bandcamp.com/{username}"
+    status: "planned"
+    capabilities: ["public_web"]
+    description: "Music fan and artist profile page on Bandcamp."
+    limitations: ["Subdomain vs user path differences"]
+
+  - id: "username.freesound"
+    name: "Freesound"
+    category: "creative"
+    target_type: "username"
+    access_type: "public_web"
+    source_url: "https://freesound.org/people/{username}/"
+    status: "planned"
+    capabilities: ["public_web"]
+    description: "Collaborative audio and sample database community profile."
+    limitations: ["Direct 404 response on missing user"]
+
+  # ============================================================================
+  # USERNAME SEARCH: Gaming & Community Platforms
+  # ============================================================================
+  - id: "username.chesscom"
+    name: "Chess.com"
+    category: "gaming"
+    target_type: "username"
+    access_type: "public_api"
+    source_url: "https://www.chess.com/member/{username}"
+    api_url: "https://api.chess.com/pub/player/{username}"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "Official published player API with ratings, joined date, and status."
+    limitations: ["API is public and rate-limited to 1 req/sec"]
+
+  - id: "username.lichess"
+    name: "Lichess"
+    category: "gaming"
+    target_type: "username"
+    access_type: "public_api"
+    source_url: "https://lichess.org/@/{username}"
+    api_url: "https://lichess.org/api/user/{username}"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "Open-source chess platform public player profile and performance stats."
+    limitations: ["Closed accounts flagged clearly"]
+
+  - id: "username.steam"
+    name: "Steam Community"
+    category: "gaming"
+    target_type: "username"
+    access_type: "public_web"
+    source_url: "https://steamcommunity.com/id/{username}"
+    status: "planned"
+    capabilities: ["public_web"]
+    description: "Custom URL Steam Community profile page."
+    limitations: ["Private Steam profiles hide inventory and library"]
+
+  - id: "username.hackernews"
+    name: "Hacker News"
+    category: "community"
+    target_type: "username"
+    access_type: "public_api"
+    source_url: "https://news.ycombinator.com/user?id={username}"
+    api_url: "https://hacker-news.firebaseio.com/v0/user/{username}.json"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "Y Combinator Hacker News public user karma and account age."
+    limitations: ["Returns null when user does not exist"]
+
+  - id: "username.wikipedia"
+    name: "Wikipedia User"
+    category: "community"
+    target_type: "username"
+    access_type: "public_api"
+    source_url: "https://en.wikipedia.org/wiki/User:{username}"
+    api_url: "https://en.wikipedia.org/w/api.php?action=query&list=users&ususers={username}&format=json"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "Wikipedia editor registration check, edit count, and registration date."
+    limitations: ["Does not verify off-wiki identity"]
+
+  - id: "username.producthunt"
+    name: "Product Hunt"
+    category: "community"
+    target_type: "username"
+    access_type: "public_web"
+    source_url: "https://www.producthunt.com/@{username}"
+    status: "planned"
+    capabilities: ["public_web"]
+    description: "Tech products and maker community public profile."
+    limitations: ["Requires HTML validation for soft 404"]
+
+  # ============================================================================
+  # EMAIL INVESTIGATION MODULES
+  # ============================================================================
+  - id: "email.syntax"
+    name: "Email Syntax Validation"
+    category: "email"
+    target_type: "email"
+    access_type: "local_analysis"
+    source_url: "https://datatracker.ietf.org/doc/html/rfc5321"
+    status: "implemented"
+    capabilities: ["tested"]
+    description: "RFC 5321 / RFC 5322 structural syntax analysis, IDNA normalization."
+    limitations: ["Does not confirm mailbox existence"]
+
+  - id: "email.dns"
+    name: "Email DNS MX Lookup"
+    category: "email"
+    target_type: "email"
+    access_type: "public_api"
+    source_url: "dns://{domain}/MX"
+    status: "implemented"
+    capabilities: ["tested"]
+    description: "Queries public Mail Exchanger (MX) DNS records with preference priorities."
+    limitations: ["DNS records indicate mail routing, not recipient mailbox presence"]
+
+  - id: "email.disposable"
+    name: "Disposable Email Check"
+    category: "email"
+    target_type: "email"
+    access_type: "local_analysis"
+    source_url: "https://github.com/disposable-email-domains/disposable-email-domains"
+    status: "implemented"
+    capabilities: ["tested"]
+    description: "Detects known temporary and disposable email inbox services."
+    limitations: ["Maintains list of 500+ common throwaway domains"]
+
+  - id: "email.gravatar"
+    name: "Gravatar Profile Discovery"
+    category: "email"
+    target_type: "email"
+    access_type: "public_api"
+    source_url: "https://en.gravatar.com/{hash}.json"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "Computes MD5 hash of email and checks public Gravatar profile entries."
+    limitations: ["Only returns profiles explicitly set to public by the account holder"]
+
+  - id: "email.security"
+    name: "Domain SPF & DMARC Security"
+    category: "email"
+    target_type: "email"
+    access_type: "public_api"
+    source_url: "dns://{domain}/TXT"
+    status: "implemented"
+    capabilities: ["tested"]
+    description: "Inspects sender policy framework (SPF) and DMARC DNS policies for domain."
+    limitations: ["Domain-level security policy, does not verify individual mailbox"]
+
+  - id: "email.hibp"
+    name: "HaveIBeenPwned API (Authorized)"
+    category: "email"
+    target_type: "email"
+    access_type: "requires_api_key"
+    source_url: "https://haveibeenpwned.com/API/v3"
+    status: "requires_api_key"
+    capabilities: ["requires_api_key"]
+    description: "Authorized lookup for public breach appearances via official HIBP API."
+    limitations: ["Requires HIBP_API_KEY environment variable. Reports requires_api_key when unset"]
+
+  # ============================================================================
+  # PHONE INVESTIGATION MODULES
+  # ============================================================================
+  - id: "phone.numbering"
+    name: "Phone Numbering Plan (ITU-T)"
+    category: "phone"
+    target_type: "phone"
+    access_type: "local_analysis"
+    source_url: "https://github.com/google/libphonenumber"
+    status: "implemented"
+    capabilities: ["tested"]
+    description: "ITU-T numbering plan metadata, E.164 normalization, and country code."
+    limitations: ["Denotes numbering allocation, not subscriber identity or live connection"]
+
+  - id: "phone.prefix_metadata"
+    name: "Phone Carrier Prefix Allocation"
+    category: "phone"
+    target_type: "phone"
+    access_type: "local_analysis"
+    source_url: "https://itu.int/itu-t"
+    status: "planned"
+    capabilities: ["planned"]
+    description: "Detailed national number prefix, mobile network code, and geographic area."
+    limitations: ["Does not account for subsequent number porting across networks"]
+
+  - id: "phone.provider_api"
+    name: "Authorized Phone Lookup Provider"
+    category: "phone"
+    target_type: "phone"
+    access_type: "requires_api_key"
+    source_url: "https://numverify.com"
+    status: "requires_api_key"
+    capabilities: ["requires_api_key"]
+    description: "Commercial phone validation lookup provider stub (Numverify/Twilio)."
+    limitations: ["Requires NUMVERIFY_API_KEY or TWILIO_ACCOUNT_SID; reports requires_api_key when unset"]
+
+  # ============================================================================
+  # NAME / PEOPLE SEARCH MODULES
+  # ============================================================================
+  - id: "name.wikipedia"
+    name: "Wikipedia Notable People Search"
+    category: "people"
+    target_type: "name"
+    access_type: "public_api"
+    source_url: "https://en.wikipedia.org/wiki/{title}"
+    api_url: "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={query}&format=json"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "Public biographical articles and notable persons matching the name on Wikipedia."
+    limitations: ["Covers notable public figures; ambiguous names returned as candidates"]
+
+  - id: "name.wikinews"
+    name: "Wikinews Public Mentions"
+    category: "people"
+    target_type: "name"
+    access_type: "public_api"
+    source_url: "https://en.wikinews.org/wiki/{title}"
+    api_url: "https://en.wikinews.org/w/api.php?action=query&list=search&srsearch={query}&format=json"
+    status: "planned"
+    capabilities: ["planned"]
+    description: "Public news reports and journalistic mentions containing the full name."
+    limitations: ["Mentions do not confirm identity or single person linkage"]
+
+  - id: "name.dblp"
+    name: "DBLP Computer Science Bibliography"
+    category: "people"
+    target_type: "name"
+    access_type: "public_api"
+    source_url: "https://dblp.org/pid/{pid}"
+    api_url: "https://dblp.org/search/author/api?q={query}&format=json"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "Public computer science scholarly author profiles and publications index."
+    limitations: ["Academic authors only"]
+
+  - id: "name.openalex"
+    name: "OpenAlex Scholarly Author Search"
+    category: "people"
+    target_type: "name"
+    access_type: "public_api"
+    source_url: "https://openalex.org/authors/{id}"
+    api_url: "https://api.openalex.org/authors?search={query}"
+    status: "implemented"
+    capabilities: ["public_web", "tested"]
+    description: "Open scholarly bibliographic catalog of global researchers and citations."
+    limitations: ["Researchers with common names will have multiple candidate records"]
+
+  - id: "name.duckduckgo"
+    name: "DuckDuckGo Public Search (Topic)"
+    category: "people"
+    target_type: "name"
+    access_type: "public_api"
+    source_url: "https://duckduckgo.com/?q={query}"
+    api_url: "https://api.duckduckgo.com/?q={query}&format=json"
+    status: "planned"
+    capabilities: ["planned"]
+    description: "DuckDuckGo public topic and instant entity summary query."
+    limitations: ["Only returns established encyclopedic and topic results"]
+
+  # ============================================================================
+  # PLANNED PLATFORMS (Cataloged for transparent roadmap tracking)
+  # ============================================================================
+  - id: "username.twitter_x"
+    name: "X / Twitter"
+    category: "social"
+    target_type: "username"
+    access_type: "requires_api_key"
+    source_url: "https://x.com/{username}"
+    status: "planned"
+    capabilities: ["planned"]
+    description: "Microblogging profile (requires X Developer API v2 subscription)."
+    limitations: ["Requires OAuth 2.0 Bearer Token; public web profile blocked by login wall"]
+
+  - id: "username.instagram"
+    name: "Instagram"
+    category: "social"
+    target_type: "username"
+    access_type: "requires_api_key"
+    source_url: "https://www.instagram.com/{username}/"
+    status: "planned"
+    capabilities: ["planned"]
+    description: "Meta photo-sharing profile (requires Meta Graph API authorization)."
+    limitations: ["Automated web requests redirected to login wall / checkpoint"]
+
+  - id: "username.linkedin"
+    name: "LinkedIn"
+    category: "social"
+    target_type: "username"
+    access_type: "requires_api_key"
+    source_url: "https://www.linkedin.com/in/{username}"
+    status: "planned"
+    capabilities: ["planned"]
+    description: "Professional networking profile."
+    limitations: ["Auth wall on automated requests; requires partner API credentials"]
+
+  - id: "username.discord"
+    name: "Discord"
+    category: "messaging"
+    target_type: "username"
+    access_type: "requires_api_key"
+    source_url: "https://discord.com"
+    status: "planned"
+    capabilities: ["planned"]
+    description: "Discord user tag (requires Bot token in shared server)."
+    limitations: ["No public unauthenticated user lookup API"]
+
+  - id: "username.tiktok"
+    name: "TikTok"
+    category: "social"
+    target_type: "username"
+    access_type: "public_web"
+    source_url: "https://www.tiktok.com/@{username}"
+    status: "planned"
+    capabilities: ["planned"]
+    description: "Short-form video creator profile."
+    limitations: ["Aggressive WAF and CAPTCHA challenge"]

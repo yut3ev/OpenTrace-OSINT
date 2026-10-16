@@ -17,16 +17,19 @@ class InvestigationRequest(BaseModel):
     username: str | None = Field(default=None, max_length=100)
     email: str | None = Field(default=None, max_length=254)
     phone: str | None = Field(default=None, max_length=40)
-    modules: list[str] | None = Field(default=None, description="Specific modules to run")
+    name: str | None = Field(default=None, max_length=120)
+    modules: list[str] | None = Field(
+        default=None, description="Specific module or source IDs to run"
+    )
     max_runtime_seconds: float | None = Field(
-        default=None, ge=1, le=120, description="Maximum runtime in seconds"
+        default=None, ge=1, le=180, description="Maximum runtime in seconds"
     )
 
     @model_validator(mode="after")
     def at_least_one_target(self) -> InvestigationRequest:
         """Ensure at least one target type is provided."""
-        if not any([self.username, self.email, self.phone]):
-            raise ValueError("At least one of username, email, or phone is required")
+        if not any([self.username, self.email, self.phone, self.name]):
+            raise ValueError("At least one of username, email, phone, or name is required")
         return self
 
 
@@ -51,6 +54,21 @@ class EdgeSchema(BaseModel):
     label: str = Field(default="candidate", description="candidate or confirmed")
 
 
+class SourceMetrics(BaseModel):
+    """Granular accounting of source attempts during an investigation."""
+
+    registered: int = 0
+    eligible: int = 0
+    attempted: int = 0
+    succeeded: int = 0
+    no_match: int = 0
+    rate_limited: int = 0
+    blocked: int = 0
+    unavailable: int = 0
+    error: int = 0
+    skipped: int = 0
+
+
 class SummarySchema(BaseModel):
     """Summary statistics for an investigation."""
 
@@ -58,6 +76,7 @@ class SummarySchema(BaseModel):
     by_status: dict[str, int] = Field(default_factory=dict)
     duration_seconds: float | None = None
     module_statuses: dict[str, str] = Field(default_factory=dict)
+    metrics: SourceMetrics = Field(default_factory=SourceMetrics)
 
 
 class InvestigationResponse(BaseModel):
@@ -73,5 +92,6 @@ class InvestigationResponse(BaseModel):
     edges: list[EdgeSchema] = Field(default_factory=list)
     summary: SummarySchema = Field(default_factory=SummarySchema)
     warnings: list[str] = Field(default_factory=list)
+    cancellation_reason: str | None = None
 
     model_config = {"from_attributes": True}

@@ -13,6 +13,7 @@ class TargetType(StrEnum):
     username = "username"
     email = "email"
     phone = "phone"
+    name = "name"
 
 
 class FindingStatus(StrEnum):
@@ -34,6 +35,30 @@ class InvestigationStatus(StrEnum):
     partial = "partial"
     failed = "failed"
     cancelled = "cancelled"
+
+
+class SourceStatus(StrEnum):
+    """Granular execution status of a specific source adapter."""
+
+    registered = "registered"
+    queued = "queued"
+    running = "running"
+    succeeded = "succeeded"
+    no_match = "no_match"
+    rate_limited = "rate_limited"
+    blocked = "blocked"
+    unavailable = "unavailable"
+    error = "error"
+    skipped = "skipped"
+
+
+class VerificationStatus(StrEnum):
+    """Evidence verification status for a match."""
+
+    verified = "verified"
+    unverified = "unverified"
+    ambiguous = "ambiguous"
+    candidate = "candidate"
 
 
 class Confidence(StrEnum):

@@ -9,12 +9,13 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from opentrace.api.schemas.common import InvestigationStatus, TargetType
+from opentrace.api.schemas.common import InvestigationStatus, SourceStatus, TargetType
 from opentrace.api.schemas.investigation import (
     EdgeSchema,
     EntitySchema,
     InvestigationRequest,
     InvestigationResponse,
+    SourceMetrics,
     SummarySchema,
 )
 from opentrace.config import Settings, get_settings
@@ -22,7 +23,12 @@ from opentrace.core.correlation import build_edges, extract_entities
 from opentrace.core.deduplication import deduplicate_findings
 from opentrace.core.errors import ValidationError
 from opentrace.core.events import Event, EventBus, EventType
-from opentrace.core.normalization import normalize_email, normalize_phone, normalize_username
+from opentrace.core.normalization import (
+    normalize_email,
+    normalize_name,
+    normalize_phone,
+    normalize_username,
+)
 from opentrace.core.scheduler import BoundedScheduler
 from opentrace.modules.base import OSINTModule
 from opentrace.modules.registry import ModuleRegistry, get_default_registry
@@ -47,6 +53,7 @@ class InvestigationOrchestrator:
         self.settings = settings or get_settings()
         self.event_bus = event_bus or EventBus()
         self.registry = registry or get_default_registry()
+        self._active_tasks: dict[str, asyncio.Task[Any]] = {}
 
         if storage is not None:
             self.storage = storage
@@ -85,6 +92,12 @@ class InvestigationOrchestrator:
                 normalized[TargetType.phone] = normalize_phone(req.phone)
             except ValidationError as e:
                 warnings.append(f"Invalid phone '{req.phone}': {e}")
+
+        if req.name:
+            try:
+                normalized[TargetType.name] = normalize_name(req.name)
+            except ValidationError as e:
+                warnings.append(f"Invalid name '{req.name}': {e}")
 
         return normalized, warnings
 
@@ -213,119 +226,233 @@ class InvestigationOrchestrator:
             )
             return resp
 
-        # Build scheduler tasks
-        tasks = []
-        for mod, target_type in module_pairs:
-            target_val = normalized_targets[target_type]
-            ctx = {
-                "investigation_id": inv_id,
-                "target_type": target_type.value,
-                "observed_at": created_at.isoformat(),
-            }
-            tasks.append((mod, target_val, ctx))
-
-        # Determine runtime limit
-        max_runtime = min(
-            req.max_runtime_seconds or self.settings.max_runtime,
-            self.settings.max_runtime,
-        )
-
-        try:
-            results = await asyncio.wait_for(
-                self.scheduler.execute_tasks(tasks),
-                timeout=max_runtime,
-            )
-        except TimeoutError:
-            warnings.append(f"Investigation hit global runtime limit of {max_runtime}s.")
-            results = []
+        current_task = asyncio.current_task()
+        if current_task:
+            self._active_tasks[inv_id] = current_task
 
         all_findings: list[dict[str, Any]] = []
         module_statuses: dict[str, str] = {}
 
-        for mod_id, findings, status_str in results:
-            module_statuses[mod_id] = status_str
-            for f in findings:
-                if "investigation_id" not in f or not f["investigation_id"]:
-                    f["investigation_id"] = inv_id
-                all_findings.append(f)
-
-        # Deduplicate findings
-        deduped = deduplicate_findings(all_findings)
-
-        # Extract entities and edges
-        raw_entities = extract_entities(deduped)
-        raw_edges = build_edges(raw_entities, deduped)
-
-        entities_schemas = [
-            EntitySchema(id=e.id, type=e.type, value=e.value, display_label=e.display_label)
-            for e in raw_entities
-        ]
-        edges_schemas = [
-            EdgeSchema(
-                source_entity_id=ed.source_entity_id,
-                dest_entity_id=ed.dest_entity_id,
-                relation=ed.relation,
-                basis=ed.basis,
-                confidence=ed.confidence,  # type: ignore[arg-type]
-                evidence_ids=ed.evidence_ids,
-                label=ed.label,
-            )
-            for ed in raw_edges
-        ]
-
-        # Calculate counts
-        by_status: dict[str, int] = {}
-        for f in deduped:
-            st = str(f.get("status", "unknown"))
-            by_status[st] = by_status.get(st, 0) + 1
-
-        duration = round(time.perf_counter() - start_time, 3)
-
-        # Determine overall investigation status
-        if not module_statuses:
-            final_status = (
-                InvestigationStatus.completed if not results else InvestigationStatus.failed
-            )
-        elif all(s == "completed" for s in module_statuses.values()):
-            final_status = InvestigationStatus.completed
-        elif any(s == "completed" for s in module_statuses.values()):
-            final_status = InvestigationStatus.partial
-        else:
-            final_status = InvestigationStatus.failed
-
-        completed_at = datetime.now(UTC)
-        summary = SummarySchema(
-            total=len(deduped),
-            by_status=by_status,
-            duration_seconds=duration,
-            module_statuses=module_statuses,
-        )
-
-        response = InvestigationResponse(
-            id=inv_id,
-            status=final_status,
-            created_at=created_at,
-            completed_at=completed_at,
-            request=req.model_dump(exclude_none=True),
-            findings=deduped,  # type: ignore[arg-type]
-            entities=entities_schemas,
-            edges=edges_schemas,
-            summary=summary,
-            warnings=warnings,
-        )
-
-        # Persist final result
-        await self.storage.save_investigation(response.model_dump())
-
-        await self.event_bus.publish(
-            Event(
-                type=EventType.investigation_completed,
-                data={
+        try:
+            # Build scheduler tasks
+            tasks = []
+            for mod, target_type in module_pairs:
+                target_val = normalized_targets[target_type]
+                ctx = {
                     "investigation_id": inv_id,
-                    "status": final_status.value,
-                    "findings_count": len(deduped),
-                },
-            )
-        )
+                    "target_type": target_type.value,
+                    "observed_at": created_at.isoformat(),
+                }
+                tasks.append((mod, target_val, ctx))
 
-        return response
+            # Determine runtime limit
+            max_runtime = min(
+                req.max_runtime_seconds or self.settings.max_runtime,
+                self.settings.max_runtime,
+            )
+
+            try:
+                results = await asyncio.wait_for(
+                    self.scheduler.execute_tasks(tasks),
+                    timeout=max_runtime,
+                )
+            except TimeoutError:
+                warnings.append(f"Investigation hit global runtime limit of {max_runtime}s.")
+                results = []
+
+            for mod_id, findings, status_str in results:
+                module_statuses[mod_id] = status_str
+                for f in findings:
+                    if "investigation_id" not in f or not f["investigation_id"]:
+                        f["investigation_id"] = inv_id
+                    all_findings.append(f)
+
+            # Deduplicate findings
+            deduped = deduplicate_findings(all_findings)
+
+            # Extract entities and edges
+            raw_entities = extract_entities(deduped)
+            raw_edges = build_edges(raw_entities, deduped)
+
+            entities_schemas = [
+                EntitySchema(id=e.id, type=e.type, value=e.value, display_label=e.display_label)
+                for e in raw_entities
+            ]
+            edges_schemas = [
+                EdgeSchema(
+                    source_entity_id=ed.source_entity_id,
+                    dest_entity_id=ed.dest_entity_id,
+                    relation=ed.relation,
+                    basis=ed.basis,
+                    confidence=ed.confidence,  # type: ignore[arg-type]
+                    evidence_ids=ed.evidence_ids,
+                    label=ed.label,
+                )
+                for ed in raw_edges
+            ]
+
+            # Calculate counts
+            by_status: dict[str, int] = {}
+            for f in deduped:
+                st = str(f.get("status", "unknown"))
+                by_status[st] = by_status.get(st, 0) + 1
+
+            # Compute SourceMetrics
+            metrics = SourceMetrics(
+                registered=len(self.registry.list_all()),
+                eligible=len(module_pairs),
+                attempted=len(module_statuses),
+            )
+            for mod_id, status_str in module_statuses.items():
+                mod_findings = [
+                    f
+                    for f in all_findings
+                    if f.get("module_id") == mod_id or f.get("source_id") == mod_id
+                ]
+                if mod_findings:
+                    st_val = mod_findings[0].get("source_status")
+                    if not st_val:
+                        if any(f.get("status") in ["found", "info"] for f in mod_findings):
+                            st_val = SourceStatus.succeeded
+                        else:
+                            st_val = SourceStatus.no_match
+
+                    if st_val in (SourceStatus.succeeded, "succeeded"):
+                        metrics.succeeded += 1
+                    elif st_val in (SourceStatus.no_match, "no_match"):
+                        metrics.no_match += 1
+                    elif st_val in (SourceStatus.rate_limited, "rate_limited"):
+                        metrics.rate_limited += 1
+                    elif st_val in (SourceStatus.blocked, "blocked"):
+                        metrics.blocked += 1
+                    elif st_val in (SourceStatus.unavailable, "unavailable"):
+                        metrics.unavailable += 1
+                    elif st_val in (SourceStatus.skipped, "skipped"):
+                        metrics.skipped += 1
+                    else:
+                        metrics.error += 1
+                else:
+                    if status_str == "timeout":
+                        metrics.unavailable += 1
+                    elif status_str == "error":
+                        metrics.error += 1
+                    elif status_str == "skipped":
+                        metrics.skipped += 1
+                    else:
+                        metrics.no_match += 1
+
+            duration = round(time.perf_counter() - start_time, 3)
+
+            # Determine overall investigation status
+            if not module_statuses:
+                final_status = (
+                    InvestigationStatus.completed if not results else InvestigationStatus.failed
+                )
+            elif all(s == "completed" for s in module_statuses.values()):
+                final_status = InvestigationStatus.completed
+            elif any(s == "completed" for s in module_statuses.values()):
+                final_status = InvestigationStatus.partial
+            else:
+                final_status = InvestigationStatus.failed
+
+            completed_at = datetime.now(UTC)
+            summary = SummarySchema(
+                total=len(deduped),
+                by_status=by_status,
+                duration_seconds=duration,
+                module_statuses=module_statuses,
+                metrics=metrics,
+            )
+
+            response = InvestigationResponse(
+                id=inv_id,
+                status=final_status,
+                created_at=created_at,
+                completed_at=completed_at,
+                request=req.model_dump(exclude_none=True),
+                findings=deduped,  # type: ignore[arg-type]
+                entities=entities_schemas,
+                edges=edges_schemas,
+                summary=summary,
+                warnings=warnings,
+            )
+
+            # Persist final result
+            await self.storage.save_investigation(response.model_dump())
+
+            await self.event_bus.publish(
+                Event(
+                    type=EventType.investigation_completed,
+                    data={
+                        "investigation_id": inv_id,
+                        "status": final_status.value,
+                        "findings_count": len(deduped),
+                    },
+                )
+            )
+
+            return response
+
+        except asyncio.CancelledError:
+            logger.info("Investigation %s was cancelled", inv_id)
+            duration = round(time.perf_counter() - start_time, 3)
+            cancelled_resp = InvestigationResponse(
+                id=inv_id,
+                status=InvestigationStatus.cancelled,
+                created_at=created_at,
+                completed_at=datetime.now(UTC),
+                request=req.model_dump(exclude_none=True),
+                findings=deduplicate_findings(all_findings),  # type: ignore[arg-type]
+                entities=[],
+                edges=[],
+                summary=SummarySchema(
+                    total=len(all_findings),
+                    by_status={},
+                    duration_seconds=duration,
+                    module_statuses=module_statuses,
+                    metrics=SourceMetrics(
+                        registered=len(self.registry.list_all()),
+                        eligible=len(module_pairs),
+                        attempted=len(module_statuses),
+                    ),
+                ),
+                warnings=warnings + ["Investigation was cancelled by user request."],
+                cancellation_reason="Cancelled by user request.",
+            )
+            await self.storage.save_investigation(cancelled_resp.model_dump())
+            await self.event_bus.publish(
+                Event(
+                    type=EventType.investigation_cancelled,
+                    data={"investigation_id": inv_id, "reason": "Cancelled by user request"},
+                )
+            )
+            return cancelled_resp
+        finally:
+            self._active_tasks.pop(inv_id, None)
+
+    async def cancel_investigation(
+        self, investigation_id: str, reason: str = "User cancelled investigation"
+    ) -> bool:
+        """Cancel an ongoing investigation."""
+        task = self._active_tasks.get(investigation_id)
+        if task and not task.done():
+            task.cancel()
+            return True
+
+        rec = await self.storage.get_investigation(investigation_id)
+        if rec and rec.get("status") in [
+            InvestigationStatus.running.value,
+            InvestigationStatus.queued.value,
+        ]:
+            rec["status"] = InvestigationStatus.cancelled.value
+            rec["cancellation_reason"] = reason
+            rec["completed_at"] = datetime.now(UTC).isoformat()
+            await self.storage.save_investigation(rec)
+            await self.event_bus.publish(
+                Event(
+                    type=EventType.investigation_cancelled,
+                    data={"investigation_id": investigation_id, "reason": reason},
+                )
+            )
+            return True
+        return False

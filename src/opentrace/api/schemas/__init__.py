@@ -6,7 +6,9 @@ from opentrace.api.schemas.common import (
     ErrorResponse,
     FindingStatus,
     InvestigationStatus,
+    SourceStatus,
     TargetType,
+    VerificationStatus,
 )
 from opentrace.api.schemas.finding import FindingSchema
 from opentrace.api.schemas.investigation import (
@@ -14,6 +16,7 @@ from opentrace.api.schemas.investigation import (
     EntitySchema,
     InvestigationRequest,
     InvestigationResponse,
+    SourceMetrics,
     SummarySchema,
 )
 
@@ -28,6 +31,9 @@ __all__ = [
     "InvestigationRequest",
     "InvestigationResponse",
     "InvestigationStatus",
+    "SourceMetrics",
+    "SourceStatus",
     "SummarySchema",
     "TargetType",
+    "VerificationStatus",
 ]

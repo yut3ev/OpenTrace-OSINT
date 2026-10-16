@@ -76,6 +76,9 @@ def investigate_cmd(
     phone: Annotated[
         str | None, typer.Option("--phone", "-p", help="Target phone number to investigate.")
     ] = None,
+    name: Annotated[
+        str | None, typer.Option("--name", "-n", help="Target person name to investigate.")
+    ] = None,
     modules: Annotated[
         list[str] | None,
         typer.Option(
@@ -91,10 +94,10 @@ def investigate_cmd(
         typer.Option("--json", help="Output raw JSON instead of human-readable tables."),
     ] = False,
 ) -> None:
-    """Run an investigation against public sources for username, email, or phone."""
-    if not any([username, email, phone]):
+    """Run an investigation against public sources for username, email, phone, or name."""
+    if not any([username, email, phone, name]):
         err_console.print(
-            "[bold red]Error (exit 2):[/bold red] At least one of --username, --email, or --phone must be specified."
+            "[bold red]Error (exit 2):[/bold red] At least one of --username, --email, --phone, or --name must be specified."
         )
         raise typer.Exit(code=2)
 
@@ -103,6 +106,7 @@ def investigate_cmd(
         username=username,
         email=email,
         phone=phone,
+        name=name,
         modules=modules,
         max_runtime_seconds=max_runtime,
     )
@@ -129,12 +133,19 @@ def investigate_cmd(
         if response.status.value == "partial"
         else "red"
     )
+    metrics = response.summary.metrics
+    metrics_str = (
+        f"[bold]Sources:[/bold] {metrics.registered} registered | {metrics.eligible} eligible | {metrics.attempted} attempted\n"
+        f"[bold]Source Results:[/bold] {metrics.succeeded} succeeded, {metrics.no_match} no match, "
+        f"{metrics.rate_limited} rate limited, {metrics.blocked} blocked, {metrics.error} errors"
+    )
     console.print(
         Panel(
             f"[bold]ID:[/bold] {response.id}\n"
             f"[bold]Status:[/bold] [{status_style}]{response.status.value.upper()}[/{status_style}]\n"
             f"[bold]Duration:[/bold] {response.summary.duration_seconds}s\n"
-            f"[bold]Total Findings:[/bold] {response.summary.total}",
+            f"[bold]Total Findings:[/bold] {response.summary.total}\n"
+            f"{metrics_str}",
             title="[bold cyan]OpenTrace Investigation Summary[/bold cyan]",
             border_style=status_style,
         )
@@ -224,6 +235,136 @@ def list_modules_cmd(
         )
 
     console.print(table)
+
+
+@app.command("sources")
+def list_sources_cmd(
+    status: Annotated[
+        str | None,
+        typer.Option(
+            "--status", "-s", help="Filter by manifest status (e.g. implemented, planned, tested)"
+        ),
+    ] = None,
+    category: Annotated[
+        str | None,
+        typer.Option(
+            "--category",
+            "-c",
+            help="Filter by category (developer, social, gaming, academic, etc.)",
+        ),
+    ] = None,
+    target: Annotated[
+        str | None,
+        typer.Option("--target", "-t", help="Filter by target type (username, email, phone, name)"),
+    ] = None,
+    as_json: Annotated[bool, typer.Option("--json", help="Output as JSON.")] = False,
+) -> None:
+    """Browse the full source registry and manifest coverage."""
+    from opentrace.modules.manifest import load_manifest
+
+    sources = load_manifest()
+    reg = get_default_registry()
+    active_ids = {m.metadata.id for m in reg.list_all()}
+
+    if status:
+        sources = [s for s in sources if s.status.lower() == status.lower()]
+    if category:
+        sources = [s for s in sources if s.category.lower() == category.lower()]
+    if target:
+        sources = [s for s in sources if s.target_type.lower() == target.lower()]
+
+    if as_json:
+        data = [
+            {
+                "id": s.id,
+                "name": s.name,
+                "category": s.category,
+                "target_type": s.target_type,
+                "access_type": s.access_type,
+                "status": s.status,
+                "source_url": s.source_url,
+                "is_active": s.id in active_ids,
+                "description": s.description,
+            }
+            for s in sources
+        ]
+        console.print(json.dumps(data, indent=2))
+        return
+
+    table = Table(title=f"Source Catalog ({len(sources)} sources)", show_lines=True)
+    table.add_column("Source ID", style="bold cyan")
+    table.add_column("Name")
+    table.add_column("Category", style="magenta")
+    table.add_column("Target", style="blue")
+    table.add_column("Access", style="dim")
+    table.add_column("Status")
+    table.add_column("Active", justify="center")
+
+    for s in sources:
+        is_act = s.id in active_ids
+        act_badge = "[bold green]YES[/bold green]" if is_act else "[dim]NO[/dim]"
+        status_color = (
+            "green"
+            if s.status == "implemented"
+            else (
+                "cyan"
+                if s.status == "tested"
+                else ("yellow" if s.status == "requires_api_key" else "dim")
+            )
+        )
+        table.add_row(
+            s.id,
+            s.name,
+            s.category,
+            s.target_type,
+            s.access_type,
+            f"[{status_color}]{s.status}[/{status_color}]",
+            act_badge,
+        )
+
+    console.print(table)
+
+
+@app.command("stats")
+def stats_cmd(
+    as_json: Annotated[bool, typer.Option("--json", help="Output stats as JSON.")] = False,
+) -> None:
+    """Display platform-wide statistics, investigations, and source metrics."""
+    from opentrace.modules.manifest import load_manifest
+
+    orchestrator = _get_orchestrator()
+    investigations = asyncio.run(orchestrator.storage.list_investigations(limit=1000))
+    total_findings = sum(len(inv.get("findings", [])) for inv in investigations)
+
+    manifest_sources = load_manifest()
+    reg = get_default_registry()
+    active_count = len(reg.list_all())
+
+    by_status: dict[str, int] = {}
+    for s in manifest_sources:
+        by_status[s.status] = by_status.get(s.status, 0) + 1
+
+    if as_json:
+        data = {
+            "total_investigations": len(investigations),
+            "total_findings": total_findings,
+            "manifest_sources": len(manifest_sources),
+            "active_modules": active_count,
+            "sources_by_status": by_status,
+        }
+        console.print(json.dumps(data, indent=2))
+        return
+
+    console.print(
+        Panel(
+            f"[bold]Total Investigations:[/bold] {len(investigations)}\n"
+            f"[bold]Total Findings Captured:[/bold] {total_findings}\n"
+            f"[bold]Total Catalog Sources:[/bold] {len(manifest_sources)}\n"
+            f"[bold]Active Running Modules:[/bold] {active_count}\n"
+            f"[bold]Catalog Breakdown:[/bold] {', '.join(f'{k}: {v}' for k, v in by_status.items())}",
+            title="[bold cyan]OpenTrace Platform Statistics[/bold cyan]",
+        )
+    )
 
 
 @app.command("show")

@@ -15,6 +15,8 @@ from opentrace.api.routes.exports import router as exports_router
 from opentrace.api.routes.health import router as health_router
 from opentrace.api.routes.investigations import router as investigations_router
 from opentrace.api.routes.modules import router as modules_router
+from opentrace.api.routes.sources import router as sources_router
+from opentrace.api.routes.stats import router as stats_router
 from opentrace.config import get_settings
 from opentrace.logging_config import setup_logging
 
@@ -66,6 +68,8 @@ def create_app() -> FastAPI:
     v1_router = APIRouter(prefix="/api/v1")
     v1_router.include_router(health_router)
     v1_router.include_router(modules_router)
+    v1_router.include_router(sources_router)
+    v1_router.include_router(stats_router)
     v1_router.include_router(investigations_router)
     v1_router.include_router(exports_router)
 

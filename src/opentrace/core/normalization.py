@@ -1,4 +1,4 @@
-"""Input normalization for all target types."""
+"""Input normalization for all target types including usernames, emails, phones, and names."""
 
 from __future__ import annotations
 
@@ -18,6 +18,10 @@ _EMAIL_RE = re.compile(
     r"(?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9]"
     r"(?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"
 )
+
+# Name: letters, spaces, hyphens, apostrophes, dots.
+_NAME_DISALLOWED_RE = re.compile(r"[<>{}\[\]\\\/;:=+*?^$!|~`@#%&]")
+_MAX_NAME_LEN = 100
 
 
 def normalize_username(raw: str) -> str:
@@ -86,3 +90,20 @@ def normalize_phone(raw: str) -> str:
         raise ValidationError("Phone number is not a possible number")
 
     return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+
+
+def normalize_name(raw: str) -> str:
+    """Normalize and validate a full name or personal name search string.
+
+    Returns cleaned, single-spaced name. Raises ValidationError on invalid input.
+    """
+    name = " ".join(raw.strip().split())
+    if not name:
+        raise ValidationError("Name cannot be empty")
+    if len(name) < 2:
+        raise ValidationError("Name must be at least 2 characters long")
+    if len(name) > _MAX_NAME_LEN:
+        raise ValidationError(f"Name exceeds {_MAX_NAME_LEN} characters")
+    if _NAME_DISALLOWED_RE.search(name):
+        raise ValidationError("Name contains invalid symbols or control characters")
+    return name

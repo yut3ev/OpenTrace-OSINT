@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -123,3 +123,52 @@ async def stream_events(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.post("/{investigation_id}/cancel")
+async def cancel_investigation(
+    investigation_id: str,
+    orchestrator: Annotated[InvestigationOrchestrator, Depends(get_orchestrator)],
+    storage: Annotated[StorageBackend, Depends(get_storage)],
+) -> dict[str, Any]:
+    """Cancel a running or queued investigation."""
+    record = await storage.get_investigation(investigation_id)
+    if not record:
+        raise InvestigationNotFoundError(investigation_id)
+    cancelled = await orchestrator.cancel_investigation(investigation_id)
+    return {"investigation_id": investigation_id, "cancelled": cancelled}
+
+
+@router.get("/{investigation_id}/findings")
+async def get_investigation_findings(
+    investigation_id: str,
+    storage: Annotated[StorageBackend, Depends(get_storage)],
+    status: str | None = None,
+) -> list[dict[str, Any]]:
+    """Retrieve findings for an investigation with optional status filter."""
+    record = await storage.get_investigation(investigation_id)
+    if not record:
+        raise InvestigationNotFoundError(investigation_id)
+    findings = list(record.get("findings", []))
+    if status:
+        findings = [
+            f for f in findings if f.get("status") == status or f.get("source_status") == status
+        ]
+    return findings
+
+
+@router.get("/{investigation_id}/sources")
+async def get_investigation_sources(
+    investigation_id: str,
+    storage: Annotated[StorageBackend, Depends(get_storage)],
+) -> dict[str, Any]:
+    """Retrieve source execution breakdown and metrics for an investigation."""
+    record = await storage.get_investigation(investigation_id)
+    if not record:
+        raise InvestigationNotFoundError(investigation_id)
+    summary = record.get("summary", {})
+    return {
+        "investigation_id": investigation_id,
+        "module_statuses": summary.get("module_statuses", {}),
+        "metrics": summary.get("metrics", {}),
+    }
