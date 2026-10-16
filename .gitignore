@@ -21,3 +21,7 @@ frontend/dist/
 *.egg-info/
 *.zip
 .DS_Store
+*.tsbuildinfo
+*.log
+.vscode/
+.idea/
