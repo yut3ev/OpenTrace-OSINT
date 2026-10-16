@@ -1,0 +1,15 @@
+name: Feature request
+description: Propose a feature or public-source integration
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Source terms/API docs and proposed access method
+    validations:
+      required: true
