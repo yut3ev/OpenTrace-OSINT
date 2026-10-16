@@ -49,10 +49,49 @@ def extract_entities(findings: list[dict[str, Any]]) -> list[Entity]:
         data = finding.get("data", {})
         module_id = finding.get("module_id", "")
 
-        # Extract target as entity
-        target_key = f"{target_type}:{finding.get('source_name', '')}"
-        if target_key not in seen_values:
-            seen_values.add(target_key)
+        # Extract matched target identifier as entity
+        matched_id = (
+            finding.get("matched_identifier") or data.get(target_type) or data.get("username")
+        )
+        if matched_id and target_type in ("username", "email", "phone", "name"):
+            id_key = f"{target_type}:{matched_id.lower() if target_type != 'phone' else matched_id}"
+            if id_key not in seen_values:
+                seen_values.add(id_key)
+                entities.append(
+                    Entity(
+                        type=target_type,
+                        value=matched_id,
+                        display_label=matched_id,
+                    )
+                )
+
+        # Extract discovered email references from data payload
+        discovered_email = data.get("email") or data.get("author_email")
+        if discovered_email and isinstance(discovered_email, str) and "@" in discovered_email:
+            email_key = f"email:{discovered_email.lower()}"
+            if email_key not in seen_values:
+                seen_values.add(email_key)
+                entities.append(
+                    Entity(
+                        type="email",
+                        value=discovered_email.lower(),
+                        display_label=discovered_email.lower(),
+                    )
+                )
+
+        # Extract discovered username references from data payload
+        discovered_user = data.get("username") or data.get("login") or data.get("handle")
+        if discovered_user and isinstance(discovered_user, str) and target_type != "username":
+            user_key = f"username:{discovered_user.lower()}"
+            if user_key not in seen_values:
+                seen_values.add(user_key)
+                entities.append(
+                    Entity(
+                        type="username",
+                        value=discovered_user.lower(),
+                        display_label=discovered_user.lower(),
+                    )
+                )
 
         # Extract platform entity from module (e.g. username.github -> github)
         if "." in module_id:

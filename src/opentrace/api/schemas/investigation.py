@@ -24,6 +24,22 @@ class InvestigationRequest(BaseModel):
     max_runtime_seconds: float | None = Field(
         default=None, ge=1, le=180, description="Maximum runtime in seconds"
     )
+    enable_pivot: bool = Field(
+        default=False,
+        description="Enable automatic recursive pivoting across discovered entities",
+    )
+    max_pivot_depth: int = Field(
+        default=1,
+        ge=1,
+        le=3,
+        description="Maximum recursive exploration depth (1-3)",
+    )
+    max_pivot_budget: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Maximum number of discovered entities to pivot per layer",
+    )
 
     @model_validator(mode="after")
     def at_least_one_target(self) -> InvestigationRequest:

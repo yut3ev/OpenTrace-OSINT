@@ -15,6 +15,7 @@ export function InvestigationForm({ onSubmit, busy }: InvestigationFormProps) {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
+  const [enablePivot, setEnablePivot] = useState(false);
   const [localError, setLocalError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
@@ -24,6 +25,11 @@ export function InvestigationForm({ onSubmit, busy }: InvestigationFormProps) {
     if (email.trim()) payload.email = email.trim();
     if (phone.trim()) payload.phone = phone.trim();
     if (name.trim()) payload.name = name.trim();
+    if (enablePivot) {
+      payload.enable_pivot = true;
+      payload.max_pivot_depth = 1;
+      payload.max_pivot_budget = 5;
+    }
 
     if (!Object.keys(payload).length) {
       setLocalError("Enter at least one target identifier.");
@@ -40,7 +46,7 @@ export function InvestigationForm({ onSubmit, busy }: InvestigationFormProps) {
         <span className="number">01</span>
         <div>
           <h2>New Investigation</h2>
-          <p>Search public, authorized digital footprints across 25+ verified sources.</p>
+          <p>Search public, authorized digital footprints across 70+ verified sources.</p>
         </div>
       </div>
 
@@ -194,6 +200,19 @@ export function InvestigationForm({ onSubmit, busy }: InvestigationFormProps) {
             />
           </div>
         )}
+
+        <div style={{ marginTop: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
+          <input
+            id="enablePivot"
+            type="checkbox"
+            checked={enablePivot}
+            onChange={(e) => setEnablePivot(e.target.checked)}
+            style={{ width: "auto", margin: 0, cursor: "pointer" }}
+          />
+          <label htmlFor="enablePivot" style={{ margin: 0, cursor: "pointer", fontSize: "13px", color: "#c9d1d9" }}>
+            Enable Recursive Pivoting <small style={{ color: "#8b949e" }}>(Automatically extract discovered emails/usernames and investigate second layer)</small>
+          </label>
+        </div>
 
         <button className="primary" disabled={busy} style={{ marginTop: "16px" }}>
           {busy ? "Investigating across sources…" : "Launch Investigation"}{" "}

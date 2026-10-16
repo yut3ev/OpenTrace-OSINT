@@ -7,12 +7,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 
-def compute_evidence_hash(source_url: str, status_code: int | None, summary: str) -> str:
+def compute_evidence_hash(
+    source_url: str, status_code: int | None, summary: str | None = None
+) -> str:
     """Compute a SHA-256 hash of evidence parameters for integrity checking.
 
     This hash is for deduplication and integrity, NOT proof that the source is truthful.
     """
-    payload = f"{source_url}|{status_code}|{summary}"
+    payload = f"{source_url}|{status_code}|{summary or ''}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 

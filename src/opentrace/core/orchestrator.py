@@ -310,7 +310,7 @@ class InvestigationOrchestrator:
             tasks = []
             for mod, target_type in module_pairs:
                 target_val = normalized_targets[target_type]
-                ctx = {
+                ctx: dict[str, Any] = {
                     "investigation_id": inv_id,
                     "target_type": target_type.value,
                     "observed_at": created_at.isoformat(),
@@ -339,6 +339,87 @@ class InvestigationOrchestrator:
                 )
             except TimeoutError:
                 warnings.append(f"Investigation hit global runtime limit of {max_runtime}s.")
+
+            # Optional recursive pivoting across discovered entities
+            searched_targets: set[tuple[str, str]] = {
+                (t.value, val.lower() if t != TargetType.phone else val)
+                for t, val in normalized_targets.items()
+            }
+
+            if req.enable_pivot and req.max_pivot_depth > 0:
+                current_depth = 0
+                while current_depth < req.max_pivot_depth:
+                    current_depth += 1
+                    # Extract entities from confirmed findings
+                    confirmed_findings = [
+                        f for f in all_findings if f.get("status") in ("found", "info")
+                    ]
+                    discovered_entities = extract_entities(confirmed_findings)
+
+                    # Find new candidate targets not yet searched
+                    new_targets: list[tuple[TargetType, str, str]] = []
+                    for entity in discovered_entities:
+                        if entity.type == "email":
+                            key = ("email", entity.value.lower())
+                            if key not in searched_targets:
+                                searched_targets.add(key)
+                                new_targets.append(
+                                    (TargetType.email, entity.value.lower(), entity.id)
+                                )
+                        elif entity.type == "username":
+                            key = ("username", entity.value.lower())
+                            if key not in searched_targets:
+                                searched_targets.add(key)
+                                new_targets.append(
+                                    (TargetType.username, entity.value.lower(), entity.id)
+                                )
+                        elif entity.type == "phone":
+                            key = ("phone", entity.value)
+                            if key not in searched_targets:
+                                searched_targets.add(key)
+                                new_targets.append((TargetType.phone, entity.value, entity.id))
+
+                    if not new_targets:
+                        break
+
+                    # Constrain to pivot budget limit
+                    budgeted_targets = new_targets[: req.max_pivot_budget]
+
+                    # Select modules for new targets
+                    pivot_tasks = []
+                    for t_type, t_val, origin_id in budgeted_targets:
+                        mods_for_type = self.registry.list_for_target(t_type)
+                        if req.modules:
+                            mods_for_type = [
+                                m for m in mods_for_type if m.metadata.id in req.modules
+                            ]
+
+                        for mod in mods_for_type:
+                            pivot_ctx: dict[str, Any] = {
+                                "investigation_id": inv_id,
+                                "target_type": t_type.value,
+                                "observed_at": datetime.now(UTC).isoformat(),
+                                "pivot_depth": current_depth,
+                                "pivoted_from_entity": origin_id,
+                            }
+                            pivot_tasks.append((mod, t_val, pivot_ctx))
+                            module_pairs.append((mod, t_type))
+
+                    if not pivot_tasks:
+                        break
+
+                    try:
+                        elapsed = time.perf_counter() - start_time
+                        remaining_runtime = max(5.0, max_runtime - elapsed)
+                        await asyncio.wait_for(
+                            self.scheduler.execute_tasks(pivot_tasks, on_result=_on_module_result),
+                            timeout=remaining_runtime,
+                        )
+                    except TimeoutError:
+                        warnings.append(
+                            f"Investigation hit global runtime limit during pivot layer {current_depth}."
+                        )
+                        break
 
             # Deduplicate findings
             deduped = deduplicate_findings(all_findings)

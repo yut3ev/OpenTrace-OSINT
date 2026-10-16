@@ -14,7 +14,9 @@
 ## Key Highlights
 
 - **Evidence-First Provenance**: Every observation includes raw cryptographic hashes (`SHA-256`), canonical target references, HTTP status codes, retrieval timestamps, and transparent confidence ratings.
-- **Honest Status Taxonomy**: Distinguishes verified presence (`found`) from clean absence (`not_found`), while explicitly recording service rate-limiting (`rate_limited`), access blocks (`blocked`), network timeouts (`unavailable`), and missing credentials (`skipped`).
+- **Honest Status Taxonomy**: Distinguishes verified presence (`found`) from clean absence (`no_match`), while explicitly recording service rate-limiting (`rate_limited`), access blocks (`blocked`), network timeouts (`unavailable`), and missing credentials (`skipped`).
+- **Recursive Multi-Layer Pivoting**: Automatically extracts typed entities (usernames, emails, phones) from confirmed findings and recursively explores them with configurable depth, budget bounds, and loop prevention.
+- **Source Validation Engine**: Includes an integrated verification utility (`opentrace validate-sources`) to deterministically test adapters against fixtures or live endpoints.
 - **Bounded Concurrency & Throttling**: Asynchronous pipeline with global execution bounds and per-host rate limiting, preventing Denial-of-Service or IP ban risks against public endpoints.
 - **No Private Probing / Breach Scraping**: Complies with strict ethical standards. Does not perform SMTP mailbox probing, password guessing, credential scraping, or paywall/CAPTCHA bypass.
 - **Zero-Footprint Storage Default**: In-memory storage by default; opt-in SQLite persistence available via environment variable.
@@ -25,28 +27,38 @@
 
 ## Primary Search Modes & Source Coverage
 
-OpenTrace includes **27 active source adapters** registered across four investigation modes:
+OpenTrace includes **74 active, tested source adapters** registered across four investigation modes:
 
-### 1. Username Discovery (`TargetType.username`)
+### 1. Username Discovery (`TargetType.username` — 53 Platforms)
 Searches public profile endpoints with custom response validation to eliminate false positives from soft-404s and redirect loops:
-- **Developer & Code Platforms**: GitHub, GitLab, Docker Hub, PyPI, npm Registry, Keybase
-- **Social & Publishing Communities**: Reddit, Mastodon, Hacker News, DEV.to, Medium, Stack Exchange
-- **Gaming & Media Platforms**: Chess.com, Lichess, Archive.org, Gravatar Avatar Discovery
+- **Developer & Code Registries**: GitHub, GitLab, Bitbucket, Docker Hub, PyPI, npm, Hugging Face, Codeberg, Hashnode, Kaggle, Replit, SourceForge, Packagist, RubyGems, Crates.io, Stack Exchange, Devpost.
+- **Social & Publishing Communities**: Mastodon, Bluesky, Reddit, Keybase, Hacker News, Wikipedia, DEV.to, Medium, Substack, Tumblr, Disqus, Product Hunt, About.me, Linktree, Buy Me a Coffee, Patreon, Pinterest, Flickr, Vimeo, SoundCloud, Bandcamp.
+- **Creative, Gaming & Technical**: Behance, Dribbble, Chess.com, Lichess, Steam Community, Twitch, Goodreads, Letterboxd, Last.fm, Strava, Duolingo, TryHackMe, LeetCode, Codeforces, Telegram.
 
-### 2. Email Address Metadata (`TargetType.email`)
-- **Syntax & RFC Normalization**: Syntax checks, internationalized domain handling, and standard format validation.
-- **DNS MX Verification**: Resolves mail exchange infrastructure records.
-- **Public Gravatar Profile Discovery**: Locates public user profiles associated with the hashed email.
-- **HaveIBeenPwned API Integration (`email.hibp`)**: When configured with `HIBP_API_KEY`, queries official incident metadata without exposing credentials. Gracefully reports `skipped` when unconfigured.
+### 2. Email Address Metadata & Discovery (`TargetType.email` — 10 Modules)
+- **RFC Syntax & Domain Validation**: Full RFC 5321 syntax verification and IDNA internationalized domain support.
+- **DNS MX Infrastructure**: Queries mail exchange records without intrusive SMTP mailbox handshakes.
+- **Disposable Provider Detection**: Identifies 500+ throwaway, burner, and temporary email domains.
+- **Public Gravatar Profiles**: Locates public user profiles and avatar metadata associated with hashed emails.
+- **Domain Security Posture**: Evaluates SPF, DMARC, and DKIM email security and spoofing defenses.
+- **GitHub Commit Attribution**: Discovers public commits and associated profile handles linked to the email.
+- **PGP Key Server Discovery**: Queries public HKP keyservers for public cryptographic keys and identities.
+- **CrossRef Author Records**: Searches academic paper publications and author digital object identifiers (DOIs).
+- **Authorized Verifiers (Optional)**: HaveIBeenPwned (`email.hibp`) and Hunter (`email.hunter_verifier`).
 
-### 3. Phone Number Metadata (`TargetType.phone`)
-- **E.164 Number Normalization**: Country code extraction, carrier format parsing, and numbering plan validation via Google's `phonenumbers` library.
-- **Carrier Lookup Provider (`phone.provider_api`)**: When configured with `NUMVERIFY_API_KEY` or `TWILIO_*`, verifies telecommunications provider, line type (mobile/landline/VoIP), and carrier assignment. Gracefully reports `skipped` when unconfigured.
+### 3. Phone Number Metadata (`TargetType.phone` — 5 Modules)
+- **ITU-T E.164 Normalization**: Country code extraction, region detection, and numbering plan validation.
+- **International Dialing Formats**: Derives RFC 3966 URI, national, and international E.164 representations.
+- **Carrier Prefix Allocation**: Resolves telecom operator assignment from public national numbering plans.
+- **Authorized Carrier Lookups (Optional)**: Real-time carrier & line-type lookups via Numverify and Twilio HLR.
 
-### 4. Name / Academic & Professional Discovery (`TargetType.name`)
+### 4. Name, Publications & Search (`TargetType.name` — 6 Modules)
+- **Wikipedia Biographies**: Searches encyclopedic entries and extracts biographical notability data.
 - **DBLP Bibliography**: Searches verified computer science publications and author entries.
-- **CrossRef Metadata**: Cross-references academic papers and registered researcher profiles.
-- **Search Query Builder**: Formulates targeted, lawful search queries for public search engines.
+- **OpenAlex Scholarly Index**: Queries global scientific research, publication counts, and institutional affiliations.
+- **CrossRef Academic Metadata**: Discovers academic papers and researcher profile records.
+- **arXiv Preprint Authors**: Searches math, physics, and computer science preprint archives.
+- **Search Query Builder**: Formulates targeted, lawful boolean queries for public web search engines.
 
 ---
 
@@ -176,6 +188,9 @@ The OpenTrace CLI is powered by Typer and Rich:
 # Run a username search across all platforms
 opentrace investigate -u octocat
 
+# Run an investigation with recursive multi-layer pivoting
+opentrace investigate -u octocat --pivot --pivot-depth 2 --pivot-budget 15
+
 # Run an email metadata check
 opentrace investigate -e developer@example.com
 
@@ -184,6 +199,12 @@ opentrace investigate -p "+14155552671"
 
 # Run a multi-target investigation
 opentrace investigate -u octocat -e developer@example.com
+
+# Validate all source adapters against deterministic fixtures
+opentrace validate-sources --fixtures
+
+# Validate specific sources or live public endpoints
+opentrace validate-sources --category username --live
 
 # Export investigation results
 opentrace export <INVESTIGATION_ID> -f html -o report.html
@@ -215,7 +236,10 @@ OpenTrace supports canonical configuration keys as well as backwards-compatible 
 | `OPENTRACE_CORS_ORIGINS` | - | `http://localhost:5173,...` | Comma-separated list of allowed CORS origins |
 | `OPENTRACE_LOG_LEVEL` | - | `INFO` | Logging verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `HIBP_API_KEY` | - | `None` | HaveIBeenPwned API key for authorized email breach lookups |
+| `HUNTER_API_KEY` | - | `None` | Hunter.io API key for professional email validation |
 | `NUMVERIFY_API_KEY` | - | `None` | Numverify API key for real-time carrier lookup |
+| `TWILIO_ACCOUNT_SID` | - | `None` | Twilio SID for live HLR carrier lookups |
+| `TWILIO_AUTH_TOKEN` | - | `None` | Twilio Auth Token for live HLR carrier lookups |
 
 Copy `.env.example` to `.env` to configure your local settings:
 
@@ -250,11 +274,14 @@ All protected endpoints accept authentication via `X-API-Key: <KEY>` or `Authori
 OpenTrace maintains a comprehensive automated test suite with full HTTP and DNS mocking:
 
 ```bash
-# Run the complete test suite (95+ tests)
+# Run the complete test suite (113 passing tests)
 pytest -v
 
 # Run with coverage reporting
 pytest --cov=opentrace --cov-report=term-missing
+
+# Run source validation utility
+opentrace validate-sources
 
 # Run code formatting and lint checks
 ruff check .

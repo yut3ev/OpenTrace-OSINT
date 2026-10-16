@@ -89,6 +89,18 @@ def investigate_cmd(
         float | None,
         typer.Option("--max-runtime", help="Maximum runtime in seconds."),
     ] = None,
+    pivot: Annotated[
+        bool,
+        typer.Option("--pivot", help="Enable recursive pivoting on discovered entities."),
+    ] = False,
+    pivot_depth: Annotated[
+        int,
+        typer.Option("--pivot-depth", help="Maximum recursion depth for pivoting (1-3)."),
+    ] = 1,
+    pivot_budget: Annotated[
+        int,
+        typer.Option("--pivot-budget", help="Maximum entity budget to pivot per layer."),
+    ] = 5,
     as_json: Annotated[
         bool,
         typer.Option("--json", help="Output raw JSON instead of human-readable tables."),
@@ -109,6 +121,9 @@ def investigate_cmd(
         name=name,
         modules=modules,
         max_runtime_seconds=max_runtime,
+        enable_pivot=pivot,
+        max_pivot_depth=pivot_depth,
+        max_pivot_budget=pivot_budget,
     )
 
     try:
@@ -476,6 +491,96 @@ def export_cmd(
             raise typer.Exit(code=1) from None
     else:
         console.print(result)
+
+
+@app.command("validate-sources")
+def validate_sources_cmd(
+    live: Annotated[
+        bool,
+        typer.Option(
+            "--live", help="Test live network connectivity against real public endpoints."
+        ),
+    ] = False,
+    target_type: Annotated[
+        str | None,
+        typer.Option(
+            "--target-type", "-t", help="Filter by target type: username, email, phone, name."
+        ),
+    ] = None,
+    category: Annotated[
+        str | None,
+        typer.Option("--category", "-c", help="Filter by source category."),
+    ] = None,
+    as_json: Annotated[
+        bool,
+        typer.Option("--json", help="Output validation results as raw JSON."),
+    ] = False,
+) -> None:
+    """Validate registered source adapters against deterministic fixtures or live endpoints."""
+    from opentrace.core.validator import validate_all_modules
+
+    mode_label = (
+        "[bold red]LIVE INTEGRATION[/bold red]"
+        if live
+        else "[bold cyan]DETERMINISTIC FIXTURE[/bold cyan]"
+    )
+    console.print(f"Running source adapter validation in {mode_label} mode...\n")
+
+    results = asyncio.run(
+        validate_all_modules(live=live, target_type=target_type, category=category)
+    )
+
+    if as_json:
+        out = [
+            {
+                "module_id": r.module_id,
+                "source_name": r.source_name,
+                "target_type": r.target_type,
+                "category": r.category,
+                "mode": r.mode,
+                "passed": r.passed,
+                "status": r.status,
+                "finding_count": r.finding_count,
+                "duration_ms": r.duration_ms,
+                "message": r.message,
+            }
+            for r in results
+        ]
+        console.print(json.dumps(out, indent=2))
+        return
+
+    table = Table(title=f"Source Adapter Validation ({len(results)} sources checked)")
+    table.add_column("Module ID", style="cyan", no_wrap=True)
+    table.add_column("Source Name", style="bold")
+    table.add_column("Type", style="magenta")
+    table.add_column("Category", style="blue")
+    table.add_column("Status", style="yellow")
+    table.add_column("Duration", justify="right")
+    table.add_column("Result", style="bold")
+
+    passed_count = sum(1 for r in results if r.passed)
+    failed_count = len(results) - passed_count
+
+    for r in results:
+        res_style = "green" if r.passed else "red"
+        res_text = f"[{res_style}]{'PASS' if r.passed else 'FAIL'}[/{res_style}]"
+        table.add_row(
+            r.module_id,
+            r.source_name,
+            r.target_type,
+            r.category,
+            r.status,
+            f"{r.duration_ms:.1f}ms",
+            res_text,
+        )
+
+    console.print(table)
+    summary_color = "green" if failed_count == 0 else "red"
+    console.print(
+        f"\n[{summary_color}]Validation complete:[/{summary_color}] {passed_count} passed, {failed_count} failed out of {len(results)} adapters."
+    )
+    if failed_count > 0:
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

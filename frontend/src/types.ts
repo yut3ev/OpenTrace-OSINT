@@ -19,6 +19,9 @@ export interface InvestigationRequest {
   name?: string;
   modules?: string[];
   max_runtime_seconds?: number;
+  enable_pivot?: boolean;
+  max_pivot_depth?: number;
+  max_pivot_budget?: number;
 }
 
 export interface Finding {
