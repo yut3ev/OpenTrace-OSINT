@@ -19,6 +19,7 @@ from opentrace.modules.registry import get_default_registry
 from opentrace.reports.csv_report import export_csv
 from opentrace.reports.html_report import export_html
 from opentrace.reports.json_report import export_json
+from opentrace.storage.interface import StorageBackend
 from opentrace.storage.memory import MemoryStorage
 from opentrace.storage.sqlite import SQLiteStorage
 
@@ -33,11 +34,16 @@ err_console = Console(stderr=True)
 
 def _get_orchestrator() -> InvestigationOrchestrator:
     settings = get_settings()
-    storage = (
-        SQLiteStorage(settings.sqlite_path)
-        if settings.storage_mode == "sqlite"
-        else MemoryStorage()
-    )
+    storage: StorageBackend
+    if settings.database_url or settings.storage_mode in ("postgres", "postgresql"):
+        from opentrace.storage.postgres import PostgreSQLStorage
+
+        db_url = settings.database_url or "postgresql://localhost/opentrace"
+        storage = PostgreSQLStorage(db_url)
+    elif settings.storage_mode == "sqlite":
+        storage = SQLiteStorage(settings.sqlite_path)
+    else:
+        storage = MemoryStorage()
     return InvestigationOrchestrator(storage=storage, settings=settings)
 
 

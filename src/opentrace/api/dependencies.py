@@ -34,7 +34,12 @@ def get_storage(settings: Annotated[Settings, Depends(get_app_settings)]) -> Sto
     """Provide the storage backend singleton."""
     global _storage_instance
     if _storage_instance is None:
-        if settings.storage_mode == "sqlite":
+        if settings.database_url or settings.storage_mode in ("postgres", "postgresql"):
+            from opentrace.storage.postgres import PostgreSQLStorage
+
+            db_url = settings.database_url or "postgresql://localhost/opentrace"
+            _storage_instance = PostgreSQLStorage(db_url)
+        elif settings.storage_mode == "sqlite":
             _storage_instance = SQLiteStorage(settings.sqlite_path)
         else:
             _storage_instance = MemoryStorage()

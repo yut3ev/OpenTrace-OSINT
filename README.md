@@ -277,15 +277,40 @@ All protected endpoints accept `Authorization: Bearer <JWT>` or `X-API-Key: <KEY
 | `GET` | `/api/v1/sources` | Filter and search the 149 source manifest registry |
 | `GET` | `/api/v1/sources/{id}` | Inspect metadata, limits, and capabilities of a source |
 | `GET` | `/api/v1/stats` | Platform coverage metrics and status distribution |
-| `GET` | `/api/v1/exports/{id}.json` | Export sanitized JSON investigation report |
-| `GET` | `/api/v1/exports/{id}.csv` | Export CSV report with anti-formula injection safeguards |
-| `GET` | `/api/v1/exports/{id}.html` | Export self-contained HTML report with CSP protection |
+| `GET` | `/api/v1/investigations/{id}/export?format=json` | Export sanitized JSON investigation report |
+| `GET` | `/api/v1/investigations/{id}/export?format=csv` | Export CSV report with anti-formula injection safeguards |
+| `GET` | `/api/v1/investigations/{id}/export?format=html` | Export self-contained HTML report with CSP protection |
 
 Interactive Swagger documentation is available at [`/docs`](http://localhost:8000/docs).
 
 ---
 
-## 15. Testing & Quality Assurance
+## 15. Production Deployment (Render + Vercel + PostgreSQL)
+
+OpenTrace is architected for seamless zero-cost deployment on public cloud free tiers:
+
+### Backend Deployment on Render (FastAPI + Docker + PostgreSQL)
+Render's Free Web Service plan runs containers with an ephemeral filesystem, and **Render Disks (`disk:`) are not supported on the free plan**.
+To provide true persistent storage with zero cost:
+1. Connect your repository to [Render](https://render.com) and click **New > Blueprint Instance**.
+2. Select your repository. Render automatically reads `render.yaml` to provision:
+   - **`opentrace-api`**: FastAPI Docker Web Service built using the repository `Dockerfile`. Listens dynamically on Render's `$PORT`, with health checks at `/health` (HTTP 200).
+   - **`opentrace-db`**: Free Managed PostgreSQL database instance, with `DATABASE_URL` automatically connected to the API.
+3. OpenTrace automatically applies database migrations on startup.
+4. Once deployed, copy your backend URL (e.g. `https://opentrace-api.onrender.com`).
+
+*(Alternative: You can also use serverless PostgreSQL providers like [Neon.tech](https://neon.tech) or [Supabase](https://supabase.com) by setting `DATABASE_URL` in your Render environment variables).*
+
+### Frontend Deployment on Vercel (React + TypeScript + Vite)
+1. Import your `OpenTrace-OSINT` repository into [Vercel](https://vercel.com).
+2. Under **Project Settings > Environment Variables**, add:
+   - `VITE_API_BASE_URL`: `https://opentrace-api.onrender.com` (your Render backend URL without trailing slash).
+3. Click **Deploy**. Vercel compiles the React SPA with automatic HTTPS and SPA routing via `vercel.json`.
+4. In your Render Dashboard, add your Vercel frontend URL to `OPENTRACE_CORS_ORIGINS` (e.g. `https://opentrace-osint.vercel.app,http://localhost:5173`).
+
+---
+
+## 16. Testing & Quality Assurance
 
 OpenTrace maintains 100% mocked offline tests to guarantee deterministic CI/CD verification:
 
@@ -312,7 +337,7 @@ cd ..
 
 ---
 
-## 16. Troubleshooting Common Issues
+## 17. Troubleshooting Common Issues
 
 - **CORS Errors in Browser:**
   Ensure `OPENTRACE_CORS_ORIGINS` in your `.env` includes `http://localhost:5173` (or your custom frontend host).
@@ -325,7 +350,7 @@ cd ..
 
 ---
 
-## 17. Security, Ethics & Responsible Use
+## 18. Security, Ethics & Responsible Use
 
 OpenTrace is built strictly for lawful digital forensics, authorized security investigations, research, and personal privacy audits.
 
@@ -338,7 +363,7 @@ For full security policy and vulnerability disclosure instructions, see [SECURIT
 
 ---
 
-## 18. Known Limitations & Roadmap
+## 19. Known Limitations & Roadmap
 
 - **Soft-404 Detection:** Some web platforms return HTTP 200 responses with custom HTML error pages. OpenTrace uses content pattern heuristics to catch these, but platforms frequently alter their markup.
 - **Public IP Throttling:** Cloud providers sharing IP addresses (e.g., shared egress IPs) may experience upstream rate limiting faster than residential IPs.
@@ -350,12 +375,12 @@ For full security policy and vulnerability disclosure instructions, see [SECURIT
 
 ---
 
-## 19. Contributing
+## 20. Contributing
 
 We welcome contributions from the open-source and security research community! Please review [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before opening a pull request or submitting an issue.
 
 ---
 
-## 20. License
+## 21. License
 
 OpenTrace OSINT is open-source software licensed under the [MIT License](LICENSE).

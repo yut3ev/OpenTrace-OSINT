@@ -201,34 +201,67 @@ cd frontend && npm run lint && npm run build
 
 OpenTrace is architected specifically for zero-cost operation on public free tiers:
 
-### A. Frontend Deployment on Vercel
-1. Import your repository on [Vercel](https://vercel.com).
-2. Set **Root Directory** to `frontend` (or leave at root; `vercel.json` compiles the dashboard).
-3. In **Project Settings > Environment Variables**, add:
-   - `VITE_API_BASE_URL`: The public URL of your backend (e.g. `https://your-opentrace-api.onrender.com` without trailing slash).
-4. Click **Deploy**. Vercel compiles the React/TypeScript bundle with SPA routing via `vercel.json`.
+### A. Backend Deployment on Render.com (FastAPI + Docker + PostgreSQL)
 
-### B. Backend Deployment on Render.com
-1. Create a free account on [Render](https://render.com).
-2. Connect your GitHub repository and click **New > Blueprint**.
-3. Select `render.yaml` in the repository root.
-4. Render provisions:
-   - `opentrace-api`: Python 3.12 Web Service on Free plan (512 MB RAM).
-   - `opentrace-data`: 1 GB persistent SQLite disk volume attached to `/data/opentrace.db`.
-5. Configure your backend Environment Variables on Render:
-   - `OPENTRACE_STORAGE_MODE=sqlite`
-   - `OPENTRACE_SQLITE_PATH=/data/opentrace.db`
-   - `OPENTRACE_REQUIRE_AUTH=true`
-   - `OPENTRACE_CORS_ORIGINS=https://your-frontend.vercel.app,http://localhost:5173`
-   - `OPENTRACE_JWT_SECRET=<YOUR-SECURE-RANDOM-SECRET>`
-6. **Storage & Persistence Architecture:** SQLite requires a persistent filesystem volume (such as Render Disk or Railway Volume). On ephemeral serverless runtimes (e.g. AWS Lambda without EFS or Vercel Serverless Functions), local disk state resets between invocations. For reliable persistence across restarts, always mount a persistent disk volume or configure an external PostgreSQL database (`DATABASE_URL`).
+Render's Free Web Service plan runs containers with an **ephemeral disk** (local SQLite files are erased when the service restarts or spins down). In addition, Render **disallows persistent disk mounts (`disk:`) on Free plans**.
 
-### C. Railway / Fly.io Alternative
-- **Railway:** Deploy directly using the provided `Dockerfile` and `docker-compose.yml` with a persistent volume.
-- **Fly.io:** Run `fly launch` using `fly.toml` with persistent storage volume mounted at `/data`.
+To achieve true zero-cost, persistent storage in production, OpenTrace includes native **PostgreSQL storage** (`PostgreSQLStorage`) alongside a free managed PostgreSQL database.
+
+#### Step-by-Step Render Deployment:
+1. Sign up for a free account on [Render](https://render.com).
+2. Go to **Blueprints** and click **New Blueprint Instance**.
+3. Connect your GitHub repository: `https://github.com/yut3ev/OpenTrace-OSINT.git`.
+4. Render automatically parses `render.yaml` and sets up:
+   - **`opentrace-api`**: Docker Web Service running the repository `Dockerfile`.
+     - Automatically listens on dynamic Render `$PORT`.
+     - Health check path configured at `/health` (HTTP 200).
+     - Security enforced with `OPENTRACE_REQUIRE_AUTH=true`.
+     - Cryptographically secure JWT secret generated automatically (`generateValue: true`).
+   - **`opentrace-db`**: Free Managed PostgreSQL database instance.
+     - `DATABASE_URL` is automatically wired into the API service via `fromDatabase`.
+     - OpenTrace automatically runs migrations on startup, creating the schema and indexes.
+5. Click **Apply**.
+6. Once deployed, note your backend URL (e.g., `https://opentrace-api.onrender.com`).
+
+> **External PostgreSQL Alternatives (Neon / Supabase):**
+> If you prefer using a serverless PostgreSQL database (e.g. [Neon.tech](https://neon.tech) or [Supabase](https://supabase.com), both offering generous free tiers that never expire), simply set the `DATABASE_URL` environment variable on your Render service to your PostgreSQL connection string:
+> `DATABASE_URL=postgresql://user:password@ep-sample-123.us-east-2.aws.neon.tech/opentrace?sslmode=require`
+
+---
+
+### B. Frontend Deployment on Vercel (React + TypeScript + Vite)
+
+1. Sign up or log in to [Vercel](https://vercel.com).
+2. Click **Add New > Project** and import `yut3ev/OpenTrace-OSINT`.
+3. In project configuration:
+   - **Framework Preset:** Vite
+   - **Root Directory:** `./` (or `frontend`)
+   - **Build Command:** `cd frontend && npm install && npm run build` (automatic via root `vercel.json`)
+   - **Output Directory:** `frontend/dist`
+4. In **Environment Variables**, add:
+   - `VITE_API_BASE_URL`: Your Render backend URL (e.g. `https://opentrace-api.onrender.com`, **without** trailing slash).
+5. Click **Deploy**.
+6. Vercel builds the bundle and serves it globally with automatic HTTPS and SPA routing via `vercel.json`.
+
+---
+
+### C. Connect Frontend & Backend (CORS & Verification)
+
+1. After Vercel deployment completes, copy your frontend domain (e.g., `https://opentrace-osint.vercel.app`).
+2. In your Render Dashboard, navigate to **`opentrace-api` > Environment**:
+   - Update `OPENTRACE_CORS_ORIGINS` to include your Vercel domain:
+     `https://opentrace-osint.vercel.app,http://localhost:5173`
+   - Render will automatically redeploy the backend with the updated CORS configuration.
+3. Open your Vercel frontend URL in the browser:
+   - Navigate to the **Sources (149)** tab to verify active source connectivity.
+   - Click **Sign Up** to create your initial administrator account.
+   - Launch your first OSINT investigation!
+
+---
 
 ### D. Zero-Cost Free-Tier Architectural Guarantees
-- **Total API cost:** $0 (149 active adapters run without requiring paid API keys).
+- **Total API cost:** $0 (149 active adapters operate on public endpoints without paid API subscriptions).
 - **RAM Footprint:** ~85 MB resident memory during active search (well within 512 MB free-tier limits).
-- **Graceful Concurrency:** Semaphores cap concurrency to prevent memory spikes.
+- **Persistent Storage:** Fully persistent investigations and user records stored in PostgreSQL.
+- **Graceful Concurrency:** Semaphores cap concurrency to prevent memory spikes on container instances.
 
