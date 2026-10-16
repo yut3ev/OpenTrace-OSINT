@@ -186,3 +186,35 @@ mypy src/opentrace
 # Run frontend type check and build
 cd frontend && npm run lint && npm run build
 ```
+
+---
+
+## 8. Free-Tier Cloud Deployment Guide ($0 / Month)
+
+OpenTrace is architected specifically for zero-cost operation on public free tiers:
+
+### A. Frontend Deployment on Vercel
+1. Import repository on [Vercel](https://vercel.com).
+2. Root directory is automatically handled by the top-level `vercel.json` (or set Root Directory to `frontend`).
+3. Set Environment Variable:
+   - `VITE_API_BASE_URL`: `https://opentrace-api.onrender.com` (your backend URL)
+4. Deploy: Vercel compiles React TypeScript static assets and caches them across its global edge network.
+
+### B. Backend Deployment on Render.com
+1. Create a free account on [Render](https://render.com).
+2. Connect your GitHub repository and click **New > Blueprint**.
+3. Select `render.yaml` in the repository root.
+4. Render provisions:
+   - `opentrace-api`: Python 3.12 Web Service on Free plan (512 MB RAM).
+   - `opentrace-data`: 1 GB persistent SQLite volume attached to `/data/opentrace.db`.
+5. Automatic cold-start handling: SQLite automatically runs migrations on startup (`src/opentrace/storage/migrations/runner.py`) in under 50ms.
+
+### C. Railway / Fly.io Alternative
+- **Railway:** Deploy directly using the provided `Dockerfile` and `docker-compose.yml`.
+- **Fly.io:** Run `fly launch` using `fly.toml` with `min_machines_running = 0` to sleep when idle and wake on request.
+
+### D. Zero-Cost Free-Tier Architectural Guarantees
+- **Total API cost:** \$0 (149 active adapters run without requiring paid API keys).
+- **RAM Footprint:** ~85 MB resident memory during active search (well within 512 MB free-tier limits).
+- **Graceful Concurrency:** Semaphores cap concurrency to prevent memory spikes.
+

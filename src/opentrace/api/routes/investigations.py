@@ -1,4 +1,4 @@
-"""Investigation endpoints including creation, listing, retrieval, deletion, and SSE events."""
+"""Investigation endpoints including creation, listing, retrieval, deletion, SSE events, and retry."""
 
 from __future__ import annotations
 
@@ -9,7 +9,12 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
-from opentrace.api.dependencies import get_event_bus, get_orchestrator, get_storage
+from opentrace.api.dependencies import (
+    get_event_bus,
+    get_optional_user,
+    get_orchestrator,
+    get_storage,
+)
 from opentrace.api.schemas.investigation import InvestigationRequest, InvestigationResponse
 from opentrace.core.errors import InvestigationNotFoundError
 from opentrace.core.events import Event, EventBus
@@ -24,27 +29,33 @@ router = APIRouter(prefix="/investigations", tags=["investigations"])
 async def create_investigation(
     request: InvestigationRequest,
     orchestrator: Annotated[InvestigationOrchestrator, Depends(get_orchestrator)],
+    user: Annotated[dict[str, Any] | None, Depends(get_optional_user)] = None,
 ) -> InvestigationResponse:
     """Run an investigation or unified search across selected compatible modules."""
-    return await orchestrator.run_investigation(request)
+    user_id = user["id"] if user else None
+    return await orchestrator.run_investigation(request, user_id=user_id)
 
 
 @router.get("", response_model=list[InvestigationResponse])
 async def list_investigations(
     storage: Annotated[StorageBackend, Depends(get_storage)],
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    user: Annotated[dict[str, Any] | None, Depends(get_optional_user)] = None,
 ) -> list[dict]:  # type: ignore[type-arg]
-    """List recent investigations, newest first."""
-    return await storage.list_investigations(limit=limit)
+    """List recent investigations, scoped to current user if authenticated."""
+    user_id = user["id"] if user else None
+    return await storage.list_investigations(limit=limit, user_id=user_id)
 
 
 @router.get("/{investigation_id}", response_model=InvestigationResponse)
 async def get_investigation(
     investigation_id: str,
     storage: Annotated[StorageBackend, Depends(get_storage)],
+    user: Annotated[dict[str, Any] | None, Depends(get_optional_user)] = None,
 ) -> dict:  # type: ignore[type-arg]
-    """Retrieve an investigation by UUID."""
-    record = await storage.get_investigation(investigation_id)
+    """Retrieve an investigation by UUID, isolated by user ownership."""
+    user_id = user["id"] if user else None
+    record = await storage.get_investigation(investigation_id, user_id=user_id)
     if not record:
         raise InvestigationNotFoundError(investigation_id)
     return record
@@ -54,12 +65,25 @@ async def get_investigation(
 async def delete_investigation(
     investigation_id: str,
     storage: Annotated[StorageBackend, Depends(get_storage)],
+    user: Annotated[dict[str, Any] | None, Depends(get_optional_user)] = None,
 ) -> dict[str, bool]:
-    """Delete an investigation record."""
-    deleted = await storage.delete_investigation(investigation_id)
+    """Delete an investigation record with ownership verification."""
+    user_id = user["id"] if user else None
+    deleted = await storage.delete_investigation(investigation_id, user_id=user_id)
     if not deleted:
         raise InvestigationNotFoundError(investigation_id)
     return {"deleted": True}
+
+
+@router.post("/{investigation_id}/retry", response_model=InvestigationResponse)
+async def retry_investigation(
+    investigation_id: str,
+    orchestrator: Annotated[InvestigationOrchestrator, Depends(get_orchestrator)],
+    user: Annotated[dict[str, Any] | None, Depends(get_optional_user)] = None,
+) -> InvestigationResponse:
+    """Retry failed, rate-limited, or unavailable sources for an investigation."""
+    user_id = user["id"] if user else None
+    return await orchestrator.retry_investigation(investigation_id, user_id=user_id)
 
 
 @router.get("/{investigation_id}/events")
@@ -67,10 +91,11 @@ async def stream_events(
     investigation_id: str,
     event_bus: Annotated[EventBus, Depends(get_event_bus)],
     storage: Annotated[StorageBackend, Depends(get_storage)],
+    user: Annotated[dict[str, Any] | None, Depends(get_optional_user)] = None,
 ) -> StreamingResponse:
     """Stream real-time investigation events via Server-Sent Events (SSE)."""
-    # Check if investigation exists or was created
-    record = await storage.get_investigation(investigation_id)
+    user_id = user["id"] if user else None
+    record = await storage.get_investigation(investigation_id, user_id=user_id)
     if not record:
         raise InvestigationNotFoundError(investigation_id)
 
@@ -80,7 +105,7 @@ async def stream_events(
         event_inv_id = str(event.data.get("investigation_id", ""))
         if event_inv_id == investigation_id:
             await queue.put(event)
-            if event.type.value == "investigation.completed":
+            if event.type.value in ("investigation.completed", "investigation.cancelled"):
                 await queue.put(None)  # Signal end of stream
 
     await event_bus.subscribe(event_handler)
@@ -131,9 +156,11 @@ async def cancel_investigation(
     investigation_id: str,
     orchestrator: Annotated[InvestigationOrchestrator, Depends(get_orchestrator)],
     storage: Annotated[StorageBackend, Depends(get_storage)],
+    user: Annotated[dict[str, Any] | None, Depends(get_optional_user)] = None,
 ) -> dict[str, Any]:
     """Cancel a running or queued investigation."""
-    record = await storage.get_investigation(investigation_id)
+    user_id = user["id"] if user else None
+    record = await storage.get_investigation(investigation_id, user_id=user_id)
     if not record:
         raise InvestigationNotFoundError(investigation_id)
     cancelled = await orchestrator.cancel_investigation(investigation_id)
@@ -145,9 +172,11 @@ async def get_investigation_findings(
     investigation_id: str,
     storage: Annotated[StorageBackend, Depends(get_storage)],
     status: str | None = None,
+    user: Annotated[dict[str, Any] | None, Depends(get_optional_user)] = None,
 ) -> list[dict[str, Any]]:
     """Retrieve findings for an investigation with optional status filter."""
-    record = await storage.get_investigation(investigation_id)
+    user_id = user["id"] if user else None
+    record = await storage.get_investigation(investigation_id, user_id=user_id)
     if not record:
         raise InvestigationNotFoundError(investigation_id)
     findings = list(record.get("findings", []))
@@ -162,9 +191,11 @@ async def get_investigation_findings(
 async def get_investigation_sources(
     investigation_id: str,
     storage: Annotated[StorageBackend, Depends(get_storage)],
+    user: Annotated[dict[str, Any] | None, Depends(get_optional_user)] = None,
 ) -> dict[str, Any]:
     """Retrieve source execution breakdown and metrics for an investigation."""
-    record = await storage.get_investigation(investigation_id)
+    user_id = user["id"] if user else None
+    record = await storage.get_investigation(investigation_id, user_id=user_id)
     if not record:
         raise InvestigationNotFoundError(investigation_id)
     summary = record.get("summary", {})

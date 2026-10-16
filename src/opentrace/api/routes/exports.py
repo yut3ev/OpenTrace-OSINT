@@ -1,12 +1,12 @@
-"""Investigation report export endpoints."""
+"""Investigation report export endpoints with user ownership isolation."""
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Response
 
-from opentrace.api.dependencies import get_storage
+from opentrace.api.dependencies import get_optional_user, get_storage
 from opentrace.core.errors import ExportError, InvestigationNotFoundError
 from opentrace.reports.csv_report import export_csv
 from opentrace.reports.html_report import export_html
@@ -21,9 +21,11 @@ async def export_investigation(
     investigation_id: str,
     storage: Annotated[StorageBackend, Depends(get_storage)],
     format: Annotated[str, Query(pattern="^(json|csv|html)$")] = "json",
+    user: Annotated[dict[str, Any] | None, Depends(get_optional_user)] = None,
 ) -> Response:
-    """Export investigation findings as JSON, CSV, or HTML."""
-    record = await storage.get_investigation(investigation_id)
+    """Export investigation findings as JSON, CSV, or HTML with ownership verification."""
+    user_id = user["id"] if user else None
+    record = await storage.get_investigation(investigation_id, user_id=user_id)
     if not record:
         raise InvestigationNotFoundError(investigation_id)
 

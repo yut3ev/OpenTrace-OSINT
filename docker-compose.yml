@@ -1,15 +1,41 @@
 services:
-  opentrace:
-    build: .
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: opentrace-backend
     ports:
       - "127.0.0.1:8000:8000"
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
-      OPENTRACE_STORAGE_MODE: ${OPENTRACE_STORAGE_MODE:-${OPENTRACE_STORAGE:-memory}}
+      OPENTRACE_STORAGE_MODE: ${OPENTRACE_STORAGE_MODE:-sqlite}
       OPENTRACE_SQLITE_PATH: ${OPENTRACE_SQLITE_PATH:-/app/data/opentrace.db}
-      OPENTRACE_DEFAULT_TIMEOUT: ${OPENTRACE_DEFAULT_TIMEOUT:-${OPENTRACE_REQUEST_TIMEOUT_SECONDS:-10.0}}
-      OPENTRACE_MAX_RUNTIME: ${OPENTRACE_MAX_RUNTIME:-${OPENTRACE_MAX_RUNTIME_SECONDS:-60.0}}
+      OPENTRACE_DEFAULT_TIMEOUT: ${OPENTRACE_DEFAULT_TIMEOUT:-10.0}
+      OPENTRACE_MAX_RUNTIME: ${OPENTRACE_MAX_RUNTIME:-60.0}
+      OPENTRACE_MAX_CONCURRENCY: ${OPENTRACE_MAX_CONCURRENCY:-5}
+      OPENTRACE_PER_HOST_CONCURRENCY: ${OPENTRACE_PER_HOST_CONCURRENCY:-2}
+      OPENTRACE_JWT_SECRET: ${OPENTRACE_JWT_SECRET:-insecure-change-in-production-jwt-key-32chars}
+      OPENTRACE_JWT_ALGORITHM: ${OPENTRACE_JWT_ALGORITHM:-HS256}
+      OPENTRACE_ACCESS_TOKEN_EXPIRE_MINUTES: ${OPENTRACE_ACCESS_TOKEN_EXPIRE_MINUTES:-10080}
+      OPENTRACE_ALLOW_REGISTRATION: ${OPENTRACE_ALLOW_REGISTRATION:-true}
+      OPENTRACE_RATE_LIMIT_PER_MINUTE: ${OPENTRACE_RATE_LIMIT_PER_MINUTE:-60}
+      OPENTRACE_CORS_ORIGINS: ${OPENTRACE_CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173}
     volumes:
-      - ./data:/app/data
+      - opentrace-data:/app/data
     restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: opentrace-frontend
+    ports:
+      - "127.0.0.1:3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  opentrace-data:

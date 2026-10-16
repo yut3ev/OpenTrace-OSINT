@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from opentrace.config import Settings, get_settings
+from opentrace.core.auth import decode_access_token
 from opentrace.core.events import EventBus
 from opentrace.core.orchestrator import InvestigationOrchestrator
 from opentrace.core.scheduler import BoundedScheduler
@@ -19,6 +21,8 @@ _storage_instance: StorageBackend | None = None
 _event_bus_instance: EventBus | None = None
 _scheduler_instance: BoundedScheduler | None = None
 _orchestrator_instance: InvestigationOrchestrator | None = None
+
+security = HTTPBearer(auto_error=False)
 
 
 def get_app_settings() -> Settings:
@@ -92,3 +96,49 @@ def reset_dependencies() -> None:
     _event_bus_instance = None
     _scheduler_instance = None
     _orchestrator_instance = None
+
+
+async def get_optional_user(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
+    storage: Annotated[StorageBackend, Depends(get_storage)],
+) -> dict[str, Any] | None:
+    """Extract and validate JWT token from Bearer auth header if provided."""
+    if not credentials or not credentials.credentials:
+        return None
+
+    try:
+        payload = decode_access_token(credentials.credentials)
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        user = await storage.get_user_by_id(str(user_id))
+        if not user or not user.get("is_active", True):
+            return None
+        return user
+    except Exception:
+        return None
+
+
+async def get_current_user(
+    user: Annotated[dict[str, Any] | None, Depends(get_optional_user)],
+) -> dict[str, Any]:
+    """Require valid authenticated user."""
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
+
+async def require_admin(
+    current_user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Require user with admin role."""
+    if current_user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrative privileges required",
+        )
+    return current_user

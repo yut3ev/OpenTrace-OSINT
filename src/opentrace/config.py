@@ -33,6 +33,16 @@ class Settings:
     twilio_account_sid: str | None = None
     twilio_auth_token: str | None = None
 
+    # Auth & Database Settings
+    database_url: str | None = None
+    jwt_secret: str = "opentrace-insecure-dev-secret-change-in-production"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 10080
+    admin_email: str | None = None
+    allow_registration: bool = True
+    rate_limit_per_minute: int = 60
+    auth_rate_limit_per_minute: int = 10
+
 
 def load_settings() -> Settings:
     """Load settings from OPENTRACE_* environment variables, supporting canonical and alias keys."""
@@ -87,6 +97,22 @@ def load_settings() -> Settings:
     twilio_account_sid = os.getenv("TWILIO_ACCOUNT_SID")
     twilio_auth_token = os.getenv("TWILIO_AUTH_TOKEN")
 
+    # Auth & Database Settings
+    database_url = os.getenv("DATABASE_URL") or os.getenv("OPENTRACE_DATABASE_URL")
+    jwt_secret = (
+        os.getenv("OPENTRACE_JWT_SECRET")
+        or os.getenv("JWT_SECRET")
+        or "opentrace-insecure-dev-secret-change-in-production"
+    )
+    jwt_algorithm = os.getenv("OPENTRACE_JWT_ALGORITHM", "HS256")
+    expire_raw = os.getenv("OPENTRACE_ACCESS_TOKEN_EXPIRE_MINUTES", "10080")
+    access_token_expire_minutes = int(expire_raw)
+    admin_email = os.getenv("OPENTRACE_ADMIN_EMAIL")
+    allow_reg_raw = os.getenv("OPENTRACE_ALLOW_REGISTRATION", "true").lower()
+    allow_registration = allow_reg_raw in ("1", "true", "yes", "on")
+    rate_limit_per_minute = int(os.getenv("OPENTRACE_RATE_LIMIT_PER_MINUTE", "60"))
+    auth_rate_limit_per_minute = int(os.getenv("OPENTRACE_AUTH_RATE_LIMIT_PER_MINUTE", "10"))
+
     return Settings(
         storage_mode=storage_mode,
         sqlite_path=sqlite_path,
@@ -103,6 +129,14 @@ def load_settings() -> Settings:
         numverify_api_key=numverify_api_key,
         twilio_account_sid=twilio_account_sid,
         twilio_auth_token=twilio_auth_token,
+        database_url=database_url,
+        jwt_secret=jwt_secret,
+        jwt_algorithm=jwt_algorithm,
+        access_token_expire_minutes=access_token_expire_minutes,
+        admin_email=admin_email,
+        allow_registration=allow_registration,
+        rate_limit_per_minute=rate_limit_per_minute,
+        auth_rate_limit_per_minute=auth_rate_limit_per_minute,
     )
 
 

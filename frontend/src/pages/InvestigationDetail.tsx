@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, Clock, Download, XCircle } from "lucide-react";
+import { ArrowLeft, Clock, Download, RefreshCw, XCircle } from "lucide-react";
 import { FindingsList } from "../components/FindingsList";
 import { api } from "../api/client";
 import type { Investigation } from "../types";
@@ -7,20 +7,24 @@ import type { Investigation } from "../types";
 interface InvestigationDetailProps {
   investigation: Investigation;
   onBack: () => void;
+  onUpdate?: (updated: Investigation) => void;
 }
 
 export function InvestigationDetail({
   investigation,
   onBack,
+  onUpdate,
 }: InvestigationDetailProps) {
   const [cancelling, setCancelling] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [cancelledLocally, setCancelledLocally] = useState(false);
-  const exportBase = `/api/v1/investigations/${encodeURIComponent(investigation.id)}/export`;
+  const [currentInv, setCurrentInv] = useState<Investigation>(investigation);
+  const exportBase = `/api/v1/investigations/${encodeURIComponent(currentInv.id)}/export`;
 
   async function handleCancel() {
     setCancelling(true);
     try {
-      await api.cancel(investigation.id);
+      await api.cancel(currentInv.id);
       setCancelledLocally(true);
     } catch (e) {
       console.error("Cancel failed:", e);
@@ -29,8 +33,27 @@ export function InvestigationDetail({
     }
   }
 
-  const metrics = investigation.summary?.metrics;
-  const currentStatus = cancelledLocally ? "cancelled" : investigation.status;
+  async function handleRetry() {
+    setRetrying(true);
+    try {
+      const updated = await api.retry(currentInv.id);
+      setCurrentInv(updated);
+      onUpdate?.(updated);
+    } catch (e) {
+      console.error("Retry failed:", e);
+    } finally {
+      setRetrying(false);
+    }
+  }
+
+  const metrics = currentInv.summary?.metrics;
+  const currentStatus = cancelledLocally ? "cancelled" : currentInv.status;
+  const hasFailures =
+    metrics &&
+    (metrics.error > 0 ||
+      metrics.unavailable > 0 ||
+      metrics.rate_limited > 0 ||
+      metrics.blocked > 0);
 
   return (
     <div>
@@ -70,6 +93,28 @@ export function InvestigationDetail({
             </button>
           )}
 
+          {currentStatus !== "running" && hasFailures && (
+            <button
+              onClick={handleRetry}
+              disabled={retrying}
+              style={{
+                background: "#1f6feb",
+                color: "#fff",
+                border: "none",
+                padding: "6px 12px",
+                borderRadius: "6px",
+                fontSize: "12px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              <RefreshCw size={14} className={retrying ? "spin" : ""} />{" "}
+              {retrying ? "Retrying Sources…" : "Retry Failed Sources"}
+            </button>
+          )}
+
           <a className="ghost" href={`${exportBase}?format=json`} download>
             <Download size={14} /> JSON
           </a>
@@ -94,14 +139,14 @@ export function InvestigationDetail({
           <div>
             <h2>Investigation Findings</h2>
             <p>
-              {investigation.findings.length} findings · Status:{" "}
+              {currentInv.findings.length} findings · Status:{" "}
               <strong className={`status ${currentStatus}`}>
                 {currentStatus.toUpperCase()}
               </strong>
-              {investigation.summary?.duration_seconds !== undefined && (
+              {currentInv.summary?.duration_seconds !== undefined && (
                 <span style={{ marginLeft: "10px", color: "#8b949e" }}>
                   <Clock size={12} style={{ display: "inline", marginRight: "3px" }} />
-                  {investigation.summary.duration_seconds}s
+                  {currentInv.summary.duration_seconds}s
                 </span>
               )}
             </p>
@@ -110,11 +155,11 @@ export function InvestigationDetail({
 
         <div className="resultMeta">
           <span>ID</span>
-          <code>{investigation.id}</code>
+          <code>{currentInv.id}</code>
           <button
             className="textButton"
             onClick={() => {
-              void navigator.clipboard?.writeText(investigation.id);
+              void navigator.clipboard?.writeText(currentInv.id);
             }}
           >
             Copy ID
@@ -176,16 +221,16 @@ export function InvestigationDetail({
           </div>
         )}
 
-        {(investigation.cancellation_reason || cancelledLocally) && (
+        {(currentInv.cancellation_reason || cancelledLocally) && (
           <div className="warning" style={{ marginBottom: "14px" }}>
             Investigation was cancelled:{" "}
-            {investigation.cancellation_reason || "Cancelled by user request."}
+            {currentInv.cancellation_reason || "Cancelled by user request."}
           </div>
         )}
 
-        {investigation.warnings && investigation.warnings.length > 0 && (
+        {currentInv.warnings && currentInv.warnings.length > 0 && (
           <div style={{ marginBottom: "14px" }}>
-            {investigation.warnings.map((warning, i) => (
+            {currentInv.warnings.map((warning, i) => (
               <div className="warning" key={i}>
                 {warning}
               </div>
@@ -193,7 +238,7 @@ export function InvestigationDetail({
           </div>
         )}
 
-        <FindingsList findings={investigation.findings} />
+        <FindingsList findings={currentInv.findings} />
       </div>
     </div>
   );

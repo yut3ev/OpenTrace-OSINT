@@ -222,7 +222,9 @@ class InvestigationOrchestrator:
         return metrics
 
     async def run_investigation(
-        self, request: InvestigationRequest | dict[str, Any]
+        self,
+        request: InvestigationRequest | dict[str, Any],
+        user_id: str | None = None,
     ) -> InvestigationResponse:
         """Run a complete investigation end-to-end."""
         if isinstance(request, dict):
@@ -241,6 +243,7 @@ class InvestigationOrchestrator:
             # None of the targets were valid
             failed_resp = InvestigationResponse(
                 id=inv_id,
+                user_id=user_id,
                 status=InvestigationStatus.failed,
                 created_at=created_at,
                 completed_at=datetime.now(UTC),
@@ -251,7 +254,7 @@ class InvestigationOrchestrator:
                 summary=SummarySchema(total=0, by_status={}, duration_seconds=0.0),
                 warnings=warnings or ["No valid targets provided."],
             )
-            await self.storage.save_investigation(failed_resp.model_dump())
+            await self.storage.save_investigation(failed_resp.model_dump(), user_id=user_id)
             return failed_resp
 
         # Select modules
@@ -263,6 +266,7 @@ class InvestigationOrchestrator:
         # Build initial investigation record
         initial_record = {
             "id": inv_id,
+            "user_id": user_id,
             "status": InvestigationStatus.running.value,
             "created_at": created_at.isoformat(),
             "request": req.model_dump(exclude_none=True),
@@ -272,7 +276,7 @@ class InvestigationOrchestrator:
             "summary": {"total": 0, "by_status": {}},
             "warnings": warnings,
         }
-        await self.storage.save_investigation(initial_record)
+        await self.storage.save_investigation(initial_record, user_id=user_id)
 
         await self.event_bus.publish(
             Event(
@@ -286,6 +290,7 @@ class InvestigationOrchestrator:
             duration = round(time.perf_counter() - start_time, 3)
             resp = InvestigationResponse(
                 id=inv_id,
+                user_id=user_id,
                 status=InvestigationStatus.completed,
                 created_at=created_at,
                 completed_at=datetime.now(UTC),
@@ -296,7 +301,7 @@ class InvestigationOrchestrator:
                 summary=SummarySchema(total=0, by_status={}, duration_seconds=duration),
                 warnings=warnings,
             )
-            await self.storage.save_investigation(resp.model_dump())
+            await self.storage.save_investigation(resp.model_dump(), user_id=user_id)
             await self.event_bus.publish(
                 Event(
                     type=EventType.investigation_completed,
@@ -486,6 +491,7 @@ class InvestigationOrchestrator:
 
             response = InvestigationResponse(
                 id=inv_id,
+                user_id=user_id,
                 status=final_status,
                 created_at=created_at,
                 completed_at=completed_at,
@@ -498,7 +504,7 @@ class InvestigationOrchestrator:
             )
 
             # Persist final result
-            await self.storage.save_investigation(response.model_dump())
+            await self.storage.save_investigation(response.model_dump(), user_id=user_id)
 
             await self.event_bus.publish(
                 Event(
@@ -544,6 +550,7 @@ class InvestigationOrchestrator:
 
             cancelled_resp = InvestigationResponse(
                 id=inv_id,
+                user_id=user_id,
                 status=InvestigationStatus.cancelled,
                 created_at=created_at,
                 completed_at=datetime.now(UTC),
@@ -561,7 +568,7 @@ class InvestigationOrchestrator:
                 warnings=warnings + ["Investigation was cancelled by user request."],
                 cancellation_reason="Cancelled by user request.",
             )
-            await self.storage.save_investigation(cancelled_resp.model_dump())
+            await self.storage.save_investigation(cancelled_resp.model_dump(), user_id=user_id)
             await self.event_bus.publish(
                 Event(
                     type=EventType.investigation_cancelled,
@@ -598,3 +605,151 @@ class InvestigationOrchestrator:
             )
             return True
         return False
+
+    async def retry_investigation(
+        self, investigation_id: str, user_id: str | None = None
+    ) -> InvestigationResponse:
+        """Retry failed, rate-limited, or unavailable sources for an existing investigation."""
+        rec = await self.storage.get_investigation(investigation_id, user_id=user_id)
+        if not rec:
+            from opentrace.core.errors import InvestigationNotFoundError
+
+            raise InvestigationNotFoundError(investigation_id)
+
+        req_dict = rec.get("request", {})
+        req = InvestigationRequest(**req_dict)
+        summary = rec.get("summary", {})
+        module_statuses = dict(summary.get("module_statuses", {}))
+
+        # Identify modules that failed, timed out, were rate limited, or unavailable
+        retry_modules = [
+            mod_id
+            for mod_id, st in module_statuses.items()
+            if st in ("error", "timeout", "rate_limited", "blocked", "unavailable")
+        ]
+
+        # Also inspect findings for modules with errors or unavailable status
+        existing_findings = list(rec.get("findings", []))
+        for f in existing_findings:
+            if f.get("status") in ("error", "unknown") and f.get("module"):
+                if f["module"] not in retry_modules:
+                    retry_modules.append(f["module"])
+
+        # If no failed modules were detected, fall back to retrying all modules from request
+        if not retry_modules:
+            retry_modules = req.modules or [m.metadata.id for m in self.registry.list_all()]
+
+        # Re-run investigation with retry_modules
+        retry_req = req.model_copy(update={"modules": retry_modules})
+        normalized_targets, _ = self._normalize_targets(retry_req)
+        module_pairs, _ = self._select_modules(retry_modules, list(normalized_targets.keys()))
+
+        if not module_pairs:
+            return InvestigationResponse.model_validate(rec)
+
+        # Remove previous failed findings from retry modules to prevent stale failures
+        surviving_findings = [
+            f
+            for f in existing_findings
+            if f.get("module") not in retry_modules or f.get("status") in ("found", "info")
+        ]
+
+        # Execute retry tasks
+        tasks: list[tuple[OSINTModule, str, dict[str, Any]]] = []
+        for mod, target_type in module_pairs:
+            target_val = normalized_targets[target_type]
+            ctx: dict[str, Any] = {
+                "investigation_id": investigation_id,
+                "target_type": target_type.value,
+                "observed_at": datetime.now(UTC).isoformat(),
+            }
+            tasks.append((mod, target_val, ctx))
+
+        all_findings = list(surviving_findings)
+
+        def _on_retry_result(mod_id: str, findings: list[dict[str, Any]], status_str: str) -> None:
+            module_statuses[mod_id] = status_str
+            for f in findings:
+                if "investigation_id" not in f or not f["investigation_id"]:
+                    f["investigation_id"] = investigation_id
+                all_findings.append(f)
+
+        await self.scheduler.execute_tasks(tasks, on_result=_on_retry_result)
+
+        deduped = deduplicate_findings(all_findings)
+        raw_entities = extract_entities(deduped)
+        raw_edges = build_edges(raw_entities, deduped)
+        entities_schemas = [
+            EntitySchema(id=e.id, type=e.type, value=e.value, display_label=e.display_label)
+            for e in raw_entities
+        ]
+        edges_schemas = [
+            EdgeSchema(
+                source_entity_id=ed.source_entity_id,
+                dest_entity_id=ed.dest_entity_id,
+                relation=ed.relation,
+                basis=ed.basis,
+                confidence=ed.confidence,  # type: ignore[arg-type]
+                evidence_ids=ed.evidence_ids,
+                label=ed.label,
+            )
+            for ed in raw_edges
+        ]
+
+        by_status: dict[str, int] = {}
+        for f in deduped:
+            st = str(f.get("status", "unknown"))
+            by_status[st] = by_status.get(st, 0) + 1
+
+        metrics = self._calculate_metrics(module_pairs, module_statuses, all_findings)
+
+        if all(s == "completed" for s in module_statuses.values()):
+            final_status = InvestigationStatus.completed
+        elif any(s == "completed" for s in module_statuses.values()):
+            final_status = InvestigationStatus.partial
+        else:
+            final_status = InvestigationStatus.failed
+
+        completed_at = datetime.now(UTC)
+        updated_summary = SummarySchema(
+            total=len(deduped),
+            by_status=by_status,
+            duration_seconds=summary.get("duration_seconds", 0.0),
+            module_statuses=module_statuses,
+            metrics=metrics,
+        )
+
+        raw_created = rec.get("created_at")
+        if isinstance(raw_created, str):
+            created_at = datetime.fromisoformat(raw_created)
+        elif isinstance(raw_created, datetime):
+            created_at = raw_created
+        else:
+            created_at = datetime.now(UTC)
+
+        response = InvestigationResponse(
+            id=investigation_id,
+            user_id=rec.get("user_id"),
+            status=final_status,
+            created_at=created_at,
+            completed_at=completed_at,
+            request=req.model_dump(exclude_none=True),
+            findings=deduped,  # type: ignore[arg-type]
+            entities=entities_schemas,
+            edges=edges_schemas,
+            summary=updated_summary,
+            warnings=rec.get("warnings", []),
+        )
+
+        await self.storage.save_investigation(response.model_dump(), user_id=rec.get("user_id"))
+        await self.event_bus.publish(
+            Event(
+                type=EventType.investigation_completed,
+                data={
+                    "investigation_id": investigation_id,
+                    "status": final_status.value,
+                    "findings_count": len(deduped),
+                },
+            )
+        )
+        return response

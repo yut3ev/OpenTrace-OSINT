@@ -4,14 +4,35 @@ import type {
   ManifestSource,
   ModuleInfo,
   PlatformStats,
+  TokenResponse,
+  User,
 } from "../types";
 
 const base = "/api/v1";
 
+const TOKEN_KEY = "opentrace_auth_token";
+
+export const authStorage = {
+  getToken: (): string | null => localStorage.getItem(TOKEN_KEY),
+  setToken: (token: string | null) => {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  },
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = authStorage.getToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init?.headers as Record<string, string> ?? {}),
+  };
+  if (token && !headers["Authorization"]) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${base}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    headers,
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -21,6 +42,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  // Modules and Sources
   modules: () => request<ModuleInfo[]>("/modules"),
   sources: (params?: { status?: string; category?: string; target_type?: string }) => {
     const query = new URLSearchParams();
@@ -30,11 +52,25 @@ export const api = {
     const qs = query.toString();
     return request<ManifestSource[]>(`/sources${qs ? `?${qs}` : ""}`);
   },
+  sourcesHealthSummary: () =>
+    request<{
+      total_active_sources: number;
+      healthy_count: number;
+      free_count: number;
+      requires_key_count: number;
+      sources: Array<Record<string, unknown>>;
+    }>("/sources/health/summary"),
+  sourceHealth: (sourceId: string) =>
+    request<Record<string, unknown>>(`/sources/${encodeURIComponent(sourceId)}/health`),
   stats: () => request<PlatformStats>("/stats"),
-  list: () => request<Investigation[]>("/investigations?limit=20"),
+
+  // Investigations
+  list: () => request<Investigation[]>("/investigations?limit=50"),
   get: (id: string) => request<Investigation>(`/investigations/${encodeURIComponent(id)}`),
   create: (payload: InvestigationRequest) =>
     request<Investigation>("/investigations", { method: "POST", body: JSON.stringify(payload) }),
+  retry: (id: string) =>
+    request<Investigation>(`/investigations/${encodeURIComponent(id)}/retry`, { method: "POST" }),
   cancel: (id: string) =>
     request<{ investigation_id: string; cancelled: boolean }>(
       `/investigations/${encodeURIComponent(id)}/cancel`,
@@ -46,4 +82,47 @@ export const api = {
     request<{ deleted: boolean }>(`/investigations/${encodeURIComponent(id)}`, {
       method: "DELETE",
     }),
+
+  // User Authentication & Account
+  auth: {
+    register: (payload: { email: string; password: string; name: string }) =>
+      request<TokenResponse>("/auth/register", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    login: (payload: { email: string; password: string }) =>
+      request<TokenResponse>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    logout: () =>
+      request<{ logged_out: boolean }>("/auth/logout", {
+        method: "POST",
+      }),
+    me: () => request<User>("/auth/me"),
+    updateProfile: (payload: { name?: string; preferences?: Record<string, unknown> }) =>
+      request<User>("/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }),
+    changePassword: (payload: { current_password: string; new_password: string }) =>
+      request<{ message: string }>("/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    deleteAccount: () =>
+      request<{ deleted: boolean }>("/auth/me", {
+        method: "DELETE",
+      }),
+    forgotPassword: (email: string) =>
+      request<{ message: string; reset_token?: string }>("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }),
+    resetPassword: (payload: { token: string; new_password: string }) =>
+      request<{ message: string }>("/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+  },
 };

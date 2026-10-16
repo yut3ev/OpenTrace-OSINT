@@ -1,0 +1,56 @@
+services:
+  # OpenTrace FastAPI Backend Service (Free Web Service)
+  - type: web
+    name: opentrace-api
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: "pip install --upgrade pip && pip install ."
+    startCommand: "uvicorn opentrace.api.app:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: OPENTRACE_STORAGE_MODE
+        value: sqlite
+      - key: OPENTRACE_SQLITE_PATH
+        value: /data/opentrace.db
+      - key: OPENTRACE_MAX_CONCURRENCY
+        value: 4
+      - key: OPENTRACE_PER_HOST_CONCURRENCY
+        value: 2
+      - key: OPENTRACE_DEFAULT_TIMEOUT
+        value: 10.0
+      - key: OPENTRACE_MAX_RUNTIME
+        value: 60.0
+      - key: OPENTRACE_JWT_SECRET
+        generateValue: true
+      - key: OPENTRACE_JWT_ALGORITHM
+        value: HS256
+      - key: OPENTRACE_ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 10080
+      - key: OPENTRACE_ALLOW_REGISTRATION
+        value: "true"
+      - key: OPENTRACE_RATE_LIMIT_PER_MINUTE
+        value: 60
+      - key: OPENTRACE_CORS_ORIGINS
+        value: "https://opentrace.vercel.app,http://localhost:5173"
+    disk:
+      name: opentrace-data
+      mountPath: /data
+      sizeGB: 1
+
+  # OpenTrace Static Frontend (Free Static Site)
+  - type: web
+    name: opentrace-frontend
+    runtime: static
+    region: oregon
+    plan: free
+    buildCommand: "cd frontend && npm install && npm run build"
+    staticPublishPath: "./frontend/dist"
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://opentrace-api.onrender.com/api/*
+      - type: rewrite
+        source: /*
+        destination: /index.html

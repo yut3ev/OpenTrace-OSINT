@@ -116,3 +116,20 @@ export interface PlatformStats {
   sources_by_category: Record<string, number>;
   sources_by_target: Record<string, number>;
 }
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  is_active: boolean;
+  preferences: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}

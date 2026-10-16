@@ -119,6 +119,7 @@ class InvestigationResponse(BaseModel):
     """Full investigation response."""
 
     id: str
+    user_id: str | None = None
     status: InvestigationStatus
     created_at: datetime
     completed_at: datetime | None = None

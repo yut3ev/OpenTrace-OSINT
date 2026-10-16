@@ -19,7 +19,10 @@
 - **Source Validation Engine**: Includes an integrated verification utility (`opentrace validate-sources`) to deterministically test adapters against fixtures or live endpoints.
 - **Bounded Concurrency & Throttling**: Asynchronous pipeline with global execution bounds and per-host rate limiting, preventing Denial-of-Service or IP ban risks against public endpoints.
 - **No Private Probing / Breach Scraping**: Complies with strict ethical standards. Does not perform SMTP mailbox probing, password guessing, credential scraping, or paywall/CAPTCHA bypass.
-- **Zero-Footprint Storage Default**: In-memory storage by default; opt-in SQLite persistence available via environment variable.
+- **User Authentication & Ownership Isolation**: Secure account creation with bcrypt password hashing and signed JWT tokens; investigations are strictly isolated by owner with anti-enumeration 404 protections.
+- **Failed Source Retry Engine**: Transparently retry failed, rate-limited, or unavailable adapters with one click without repeating successful checks.
+- **Full Public Web Platform**: Responsive React dashboard featuring a public landing page, interactive source catalog (149 adapters), architecture specs, and ethics/privacy guidelines.
+- **Free-Tier Cloud Architecture ($0/Month)**: Production-ready for free hosting tiers (Vercel, Render, Railway, Fly.io) with bounded memory footprints (~85 MB) and zero paid API dependencies.
 - **Unified Tri-Interface**: Web Dashboard (React + TypeScript + Vite), Python CLI (`opentrace` via Typer and Rich), and REST API with live Server-Sent Events (SSE).
 - **Secure Report Exporters**: Generate sanitized JSON, CSV, or standalone single-file HTML reports hardened with Content Security Policy (CSP) and strict HTML escaping.
 

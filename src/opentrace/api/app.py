@@ -60,7 +60,12 @@ def create_app() -> FastAPI:
 
         path = request.url.path
         public_paths = {"/health", "/api/v1/health", "/docs", "/redoc", "/openapi.json"}
-        if path in public_paths or path.startswith("/docs") or path.startswith("/redoc"):
+        if (
+            path in public_paths
+            or path.startswith("/docs")
+            or path.startswith("/redoc")
+            or path.startswith("/api/v1/auth")
+        ):
             res_pub: Response = await call_next(request)
             return res_pub
 
@@ -102,8 +107,11 @@ def create_app() -> FastAPI:
     # API v1 Router
     from fastapi import APIRouter
 
+    from opentrace.api.routes.auth import router as auth_router
+
     v1_router = APIRouter(prefix="/api/v1")
     v1_router.include_router(health_router)
+    v1_router.include_router(auth_router)
     v1_router.include_router(modules_router)
     v1_router.include_router(sources_router)
     v1_router.include_router(stats_router)
