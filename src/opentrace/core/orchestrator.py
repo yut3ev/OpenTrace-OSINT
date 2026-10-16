@@ -28,6 +28,7 @@ from opentrace.core.normalization import (
     normalize_name,
     normalize_phone,
     normalize_username,
+    normalize_web,
 )
 from opentrace.core.scheduler import BoundedScheduler
 from opentrace.modules.base import OSINTModule
@@ -98,6 +99,12 @@ class InvestigationOrchestrator:
                 normalized[TargetType.name] = normalize_name(req.name)
             except ValidationError as e:
                 warnings.append(f"Invalid name '{req.name}': {e}")
+
+        if req.web:
+            try:
+                normalized[TargetType.web] = normalize_web(req.web)
+            except ValidationError as e:
+                warnings.append(f"Invalid web query '{req.web}': {e}")
 
         return normalized, warnings
 

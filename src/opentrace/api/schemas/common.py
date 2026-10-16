@@ -14,6 +14,7 @@ class TargetType(StrEnum):
     email = "email"
     phone = "phone"
     name = "name"
+    web = "web"
 
 
 class FindingStatus(StrEnum):

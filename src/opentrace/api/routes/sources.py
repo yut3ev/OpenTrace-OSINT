@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -68,6 +68,37 @@ async def list_sources(
             )
         )
     return results
+
+
+@router.get("/health/summary")
+async def get_sources_health_summary(
+    registry: Annotated[ModuleRegistry, Depends(get_registry)],
+) -> dict[str, Any]:
+    """Retrieve operational health summary for all registered active sources."""
+    all_mods = registry.list_all()
+    health_results: list[dict[str, Any]] = []
+    for mod in all_mods:
+        health_results.append(await mod.health_check())
+
+    return {
+        "total_active_sources": len(all_mods),
+        "healthy_count": sum(1 for h in health_results if h.get("status") == "healthy"),
+        "free_count": sum(1 for h in health_results if h.get("is_free", True)),
+        "requires_key_count": sum(1 for h in health_results if h.get("requires_api_key", False)),
+        "sources": health_results,
+    }
+
+
+@router.get("/{source_id}/health")
+async def get_source_health(
+    source_id: str,
+    registry: Annotated[ModuleRegistry, Depends(get_registry)],
+) -> dict[str, Any]:
+    """Perform runtime health check for a specific source adapter."""
+    mod = registry.get(source_id)
+    if not mod:
+        raise HTTPException(status_code=404, detail=f"Active module '{source_id}' not found.")
+    return await mod.health_check()
 
 
 @router.get("/{source_id}", response_model=SourceResponse)

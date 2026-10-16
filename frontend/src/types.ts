@@ -1,4 +1,4 @@
-export type TargetType = "username" | "email" | "phone" | "name";
+export type TargetType = "username" | "email" | "phone" | "name" | "web";
 export type FindingStatus = "found" | "not_found" | "unknown" | "info" | "error";
 export type SourceStatus =
   | "registered"
@@ -17,6 +17,9 @@ export interface InvestigationRequest {
   email?: string;
   phone?: string;
   name?: string;
+  web?: string;
+  query?: string;
+  target_type?: TargetType;
   modules?: string[];
   max_runtime_seconds?: number;
   enable_pivot?: boolean;

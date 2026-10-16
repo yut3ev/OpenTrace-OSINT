@@ -79,6 +79,12 @@ def investigate_cmd(
     name: Annotated[
         str | None, typer.Option("--name", "-n", help="Target person name to investigate.")
     ] = None,
+    web: Annotated[
+        str | None, typer.Option("--web", "-w", help="Target web search query to investigate.")
+    ] = None,
+    query: Annotated[
+        str | None, typer.Option("--query", "-q", help="Unified search query.")
+    ] = None,
     modules: Annotated[
         list[str] | None,
         typer.Option(
@@ -106,10 +112,10 @@ def investigate_cmd(
         typer.Option("--json", help="Output raw JSON instead of human-readable tables."),
     ] = False,
 ) -> None:
-    """Run an investigation against public sources for username, email, phone, or name."""
-    if not any([username, email, phone, name]):
+    """Run an investigation against public sources for username, email, phone, name, or web."""
+    if not any([username, email, phone, name, web, query]):
         err_console.print(
-            "[bold red]Error (exit 2):[/bold red] At least one of --username, --email, --phone, or --name must be specified."
+            "[bold red]Error (exit 2):[/bold red] At least one of --username, --email, --phone, --name, --web, or --query must be specified."
         )
         raise typer.Exit(code=2)
 
@@ -119,6 +125,8 @@ def investigate_cmd(
         email=email,
         phone=phone,
         name=name,
+        web=web,
+        query=query,
         modules=modules,
         max_runtime_seconds=max_runtime,
         enable_pivot=pivot,
@@ -231,7 +239,7 @@ def list_modules_cmd(
         return
 
     table = Table(title="Registered OSINT Modules", show_lines=True)
-    table.add_column("Module ID", style="bold cyan")
+    table.add_column("Module ID", style="bold cyan", no_wrap=True)
     table.add_column("Name")
     table.add_column("Targets", style="magenta")
     table.add_column("Status", style="green")

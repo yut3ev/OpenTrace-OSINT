@@ -27,15 +27,15 @@
 
 ## Primary Search Modes & Source Coverage
 
-OpenTrace includes **74 active, tested source adapters** registered across four investigation modes:
+OpenTrace includes **149 active, tested source adapters** operating 100% free with zero paid API dependencies, registered across five investigation modes:
 
-### 1. Username Discovery (`TargetType.username` — 53 Platforms)
+### 1. Username Discovery (`TargetType.username` — 118 Platforms)
 Searches public profile endpoints with custom response validation to eliminate false positives from soft-404s and redirect loops:
-- **Developer & Code Registries**: GitHub, GitLab, Bitbucket, Docker Hub, PyPI, npm, Hugging Face, Codeberg, Hashnode, Kaggle, Replit, SourceForge, Packagist, RubyGems, Crates.io, Stack Exchange, Devpost.
-- **Social & Publishing Communities**: Mastodon, Bluesky, Reddit, Keybase, Hacker News, Wikipedia, DEV.to, Medium, Substack, Tumblr, Disqus, Product Hunt, About.me, Linktree, Buy Me a Coffee, Patreon, Pinterest, Flickr, Vimeo, SoundCloud, Bandcamp.
-- **Creative, Gaming & Technical**: Behance, Dribbble, Chess.com, Lichess, Steam Community, Twitch, Goodreads, Letterboxd, Last.fm, Strava, Duolingo, TryHackMe, LeetCode, Codeforces, Telegram.
+- **Developer & Code Registries (37 platforms)**: GitHub, GitLab, Bitbucket, Docker Hub, PyPI, npm, Hugging Face, Codeberg, Hashnode, Kaggle, Replit, SourceForge, Packagist, RubyGems, Crates.io, Stack Exchange, Devpost, HackerRank, Codewars, Codecademy, GeeksforGeeks, Topcoder, WakaTime, Hack The Box, Bugcrowd, Launchpad, asciinema, AnkiWeb, freeCodeCamp, Coderwall, Lobsters, MIT Scratch, Exercism, Weblate, Gitea, SourceHut, Pastebin.
+- **Social, Publishing & Communities (45 platforms)**: Mastodon, Bluesky, Reddit, Keybase, Hacker News, Wikipedia, DEV.to, Medium, Substack, Tumblr, Disqus, Product Hunt, About.me, Linktree, Buy Me a Coffee, Patreon, Pinterest, Flickr, Vimeo, Quora, Discourse Meta, F-Droid Community, Bitwarden Forum, Wikiquote, Wiktionary, Wikivoyage, WordPress.com, Blogger, LiveJournal, Telegra.ph, Vero, Gravatar Profiles, OpenSea, Trello, Scratch Community, Goodreads, Letterboxd, Last.fm, Strava, Duolingo, TryHackMe, LeetCode, Codeforces, Telegram.
+- **Creative, Audio, Media & Gaming (36 platforms)**: Behance, Dribbble, DeviantArt, ArtStation, 500px, SmugMug, Pixiv, Wattpad, Internet Archive, Instructables, SoundCloud, Bandcamp, Mixcloud, Audiomack, ReverbNation, Freesound, Audioboom, Trakt.tv, MyAnimeList, AniList, Chess.com, Lichess, Steam Community, Twitch, itch.io, Speedrun.com, Roblox, osu!, NameMC, Kongregate, Newgrounds, BoardGameGeek, Chessgames, SpigotMC, Nexus Mods.
 
-### 2. Email Address Metadata & Discovery (`TargetType.email` — 10 Modules)
+### 2. Email Address Metadata & Discovery (`TargetType.email` — 13 Modules)
 - **RFC Syntax & Domain Validation**: Full RFC 5321 syntax verification and IDNA internationalized domain support.
 - **DNS MX Infrastructure**: Queries mail exchange records without intrusive SMTP mailbox handshakes.
 - **Disposable Provider Detection**: Identifies 500+ throwaway, burner, and temporary email domains.
@@ -44,21 +44,34 @@ Searches public profile endpoints with custom response validation to eliminate f
 - **GitHub Commit Attribution**: Discovers public commits and associated profile handles linked to the email.
 - **PGP Key Server Discovery**: Queries public HKP keyservers for public cryptographic keys and identities.
 - **CrossRef Author Records**: Searches academic paper publications and author digital object identifiers (DOIs).
+- **ICANN RDAP Domain Records**: Queries public RDAP gateways for official domain registry and registrar info.
+- **RFC 9116 security.txt**: Discovers published vulnerability disclosure policies and security contacts.
+- **Certificate Transparency (crt.sh)**: Inspects public TLS certificate logs for domain infrastructure.
 - **Authorized Verifiers (Optional)**: HaveIBeenPwned (`email.hibp`) and Hunter (`email.hunter_verifier`).
 
-### 3. Phone Number Metadata (`TargetType.phone` — 5 Modules)
+### 3. Phone Number Metadata (`TargetType.phone` — 7 Modules)
 - **ITU-T E.164 Normalization**: Country code extraction, region detection, and numbering plan validation.
 - **International Dialing Formats**: Derives RFC 3966 URI, national, and international E.164 representations.
 - **Carrier Prefix Allocation**: Resolves telecom operator assignment from public national numbering plans.
+- **Geographic Timezone Mapping**: Resolves primary and applicable timezones from telephone numbering plans.
+- **ITU-T Number Type & Validation**: Audits numbering rules for mobile, fixed-line, toll-free, and VoIP allocations.
 - **Authorized Carrier Lookups (Optional)**: Real-time carrier & line-type lookups via Numverify and Twilio HLR.
 
-### 4. Name, Publications & Search (`TargetType.name` — 6 Modules)
-- **Wikipedia Biographies**: Searches encyclopedic entries and extracts biographical notability data.
+### 4. Name, Scholar & Public Records (`TargetType.name` — 9 Modules)
+- **Wikidata Biographical Entities**: Resolves public Q-identities, descriptors, and Wikimedia concept links.
+- **Wikipedia Notable Biographies**: Searches encyclopedic entries and extracts biographical notability data.
+- **Wikipedia Full-Text Search**: Full-text keyword searches across encyclopedic article bodies.
+- **Semantic Scholar Academic Graph**: Queries academic authors, citation counts, paper volumes, and h-index.
 - **DBLP Bibliography**: Searches verified computer science publications and author entries.
 - **OpenAlex Scholarly Index**: Queries global scientific research, publication counts, and institutional affiliations.
 - **CrossRef Academic Metadata**: Discovers academic papers and researcher profile records.
 - **arXiv Preprint Authors**: Searches math, physics, and computer science preprint archives.
 - **Search Query Builder**: Formulates targeted, lawful boolean queries for public web search engines.
+
+### 5. Public Web Search (`TargetType.web` — 2 Modules)
+- **DuckDuckGo Instant Answer API**: Queries public instant answers, entity definitions, and verified topic abstracts.
+- **Open Web Search Gateway**: Formulates safe, targeted boolean operators for search engines and open gateways.
+
 
 ---
 
@@ -274,7 +287,7 @@ All protected endpoints accept authentication via `X-API-Key: <KEY>` or `Authori
 OpenTrace maintains a comprehensive automated test suite with full HTTP and DNS mocking:
 
 ```bash
-# Run the complete test suite (113 passing tests)
+# Run the complete test suite (129 passing tests)
 pytest -v
 
 # Run with coverage reporting

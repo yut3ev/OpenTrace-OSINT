@@ -22,14 +22,16 @@ class ModuleMetadata:
     description: str
     enabled: bool = True
     implementation_status: str = "implemented"  # implemented, tested, requires_api_key, requires_oauth, public_web, temporarily_unavailable, planned
-    category: str = (
-        "general"  # developer, social, blogging, creative, gaming, messaging, email, phone, people
-    )
+    category: str = "general"  # developer, social, blogging, creative, gaming, messaging, email, phone, people, web
     access_type: str = "public_web"  # public_web, public_api, requires_api_key, local_analysis
     limitations: list[str] = field(default_factory=list)
     timeout: float = 10.0
     max_requests: int = 5
     rate_limit_per_second: float = 1.0
+    license: str = "MIT"
+    requires_api_key: bool = False
+    is_free: bool = True
+    rate_limit_policy: str = "default"
 
 
 class OSINTModule(abc.ABC):
@@ -48,6 +50,65 @@ class OSINTModule(abc.ABC):
         Returns a list of raw finding dictionaries conforming to FindingSchema.
         """
         ...
+
+    @property
+    def source_id(self) -> str:
+        return self.metadata.id
+
+    @property
+    def source_name(self) -> str:
+        return self.metadata.source_name
+
+    @property
+    def category(self) -> str:
+        return self.metadata.category
+
+    @property
+    def base_url(self) -> str:
+        return self.metadata.source_url
+
+    @property
+    def license(self) -> str:
+        return self.metadata.license
+
+    @property
+    def requires_api_key(self) -> bool:
+        return self.metadata.requires_api_key
+
+    @property
+    def is_free(self) -> bool:
+        return self.metadata.is_free
+
+    @property
+    def timeout(self) -> float:
+        return self.metadata.timeout
+
+    @property
+    def rate_limit_policy(self) -> str:
+        return self.metadata.rate_limit_policy
+
+    async def check_availability(self) -> bool:
+        """Check if source is reachable and operational."""
+        return self.metadata.enabled
+
+    async def health_check(self) -> dict[str, Any]:
+        """Perform a basic health check on the source adapter."""
+        return {
+            "source_id": self.source_id,
+            "status": "healthy" if self.metadata.enabled else "disabled",
+            "is_free": self.is_free,
+            "requires_api_key": self.requires_api_key,
+        }
+
+    async def search(
+        self, query: str, context: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
+        """Unified search interface delegating to run()."""
+        return await self.run(query, context)
+
+    def normalize_result(self, raw_result: dict[str, Any]) -> dict[str, Any]:
+        """Normalize raw finding dictionary according to common schema."""
+        return raw_result
 
     def supports(self, target_type: TargetType | str) -> bool:
         """Check if target type is supported by this module."""

@@ -20,11 +20,12 @@ router = APIRouter(prefix="/investigations", tags=["investigations"])
 
 
 @router.post("", response_model=InvestigationResponse, status_code=200)
+@router.post("/search", response_model=InvestigationResponse, status_code=200)
 async def create_investigation(
     request: InvestigationRequest,
     orchestrator: Annotated[InvestigationOrchestrator, Depends(get_orchestrator)],
 ) -> InvestigationResponse:
-    """Run an investigation across selected compatible modules."""
+    """Run an investigation or unified search across selected compatible modules."""
     return await orchestrator.run_investigation(request)
 
 

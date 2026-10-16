@@ -15,6 +15,11 @@ from opentrace.modules.email.extended_email import (
     HunterVerifierEmailModule,
     PgpKeyserverEmailModule,
 )
+from opentrace.modules.email.free_osint import (
+    EmailCertificateTransparencyModule,
+    EmailRDAPDomainModule,
+    EmailSecurityTxtModule,
+)
 from opentrace.modules.email.gravatar import GravatarEmailModule
 from opentrace.modules.email.hibp import HaveIBeenPwnedEmailModule
 from opentrace.modules.email.security import EmailSecurityModule
@@ -25,12 +30,21 @@ from opentrace.modules.people.extended_people import (
     CrossrefAuthorModule,
     SearchQueryGeneratorModule,
 )
+from opentrace.modules.people.free_people import (
+    SemanticScholarAuthorModule,
+    WikidataEntityModule,
+    WikipediaFullTextSearchModule,
+)
 from opentrace.modules.people.openalex import OpenAlexAuthorModule
 from opentrace.modules.people.wikipedia import WikipediaPersonModule
 from opentrace.modules.phone.extended_phone import (
     PhoneCarrierPrefixModule,
     PhoneHlrLookupModule,
     PhoneInternationalModule,
+)
+from opentrace.modules.phone.free_phone import (
+    PhoneTimezoneModule,
+    PhoneValidationRulesModule,
 )
 from opentrace.modules.phone.numbering import PhoneNumberingModule
 from opentrace.modules.phone.provider import AuthorizedPhoneLookupModule
@@ -93,12 +107,84 @@ from opentrace.modules.usernames.gaming_community import (
 )
 from opentrace.modules.usernames.github import GitHubUsernameModule
 from opentrace.modules.usernames.gitlab import GitLabUsernameModule
+from opentrace.modules.usernames.sherlock_community import (
+    BitwardenForumUsernameModule,
+    BloggerUsernameModule,
+    DiscourseMetaUsernameModule,
+    FDroidForumUsernameModule,
+    GravatarProfileUsernameModule,
+    KongregateUsernameModule,
+    LiveJournalUsernameModule,
+    NameMCUsernameModule,
+    NewgroundsUsernameModule,
+    NexusModsUsernameModule,
+    OpenSeaUsernameModule,
+    OsuUsernameModule,
+    QuoraUsernameModule,
+    RobloxUsernameModule,
+    ScratchForumUsernameModule,
+    SpeedrunUsernameModule,
+    SpeedrunWRUsernameModule,
+    SpigotMCUsernameModule,
+    TelegraphUsernameModule,
+    TrelloUsernameModule,
+    VeroUsernameModule,
+    WikiquoteUsernameModule,
+    WikivoyageUsernameModule,
+    WiktionaryUsernameModule,
+    WordPressUsernameModule,
+)
+from opentrace.modules.usernames.sherlock_creative import (
+    AniListUsernameModule,
+    ArchiveOrgUsernameModule,
+    ArtStationUsernameModule,
+    AudioboomUsernameModule,
+    AudiomackUsernameModule,
+    BandcampFansUsernameModule,
+    BoardGameGeekUsernameModule,
+    ChessgamesUsernameModule,
+    DeviantArtUsernameModule,
+    FiveHundredPxUsernameModule,
+    FreesoundUsernameModule,
+    InstructablesUsernameModule,
+    ItchIoUsernameModule,
+    MixcloudUsernameModule,
+    MyAnimeListUsernameModule,
+    PixivUsernameModule,
+    ReverbNationUsernameModule,
+    SmugMugUsernameModule,
+    TraktUsernameModule,
+    WattpadUsernameModule,
+)
+from opentrace.modules.usernames.sherlock_developer import (
+    AnkiWebUsernameModule,
+    AsciinemaUsernameModule,
+    BugcrowdUsernameModule,
+    CodecademyUsernameModule,
+    CoderwallUsernameModule,
+    CodewarsUsernameModule,
+    ExercismUsernameModule,
+    FreeCodeCampUsernameModule,
+    GeeksforGeeksUsernameModule,
+    GiteaUsernameModule,
+    HackerRankUsernameModule,
+    HackTheBoxUsernameModule,
+    LaunchpadUsernameModule,
+    LobstersUsernameModule,
+    PastebinUsernameModule,
+    ScratchUsernameModule,
+    SourceHutUsernameModule,
+    TopcoderUsernameModule,
+    WakatimeUsernameModule,
+    WeblateUsernameModule,
+)
 from opentrace.modules.usernames.social import (
     BlueskyUsernameModule,
     KeybaseUsernameModule,
     MastodonUsernameModule,
     RedditUsernameModule,
 )
+from opentrace.modules.web.search import DuckDuckGoInstantModule, OpenWebSearchModule
 
 logger = logging.getLogger("opentrace.modules.registry")
 
@@ -215,6 +301,77 @@ def get_default_registry() -> ModuleRegistry:
         reg.register(CodeforcesUsernameModule())
         reg.register(TelegramUsernameModule())
 
+        # Sherlock Developer Platforms (MIT)
+        reg.register(HackerRankUsernameModule())
+        reg.register(CodewarsUsernameModule())
+        reg.register(CodecademyUsernameModule())
+        reg.register(GeeksforGeeksUsernameModule())
+        reg.register(TopcoderUsernameModule())
+        reg.register(WakatimeUsernameModule())
+        reg.register(HackTheBoxUsernameModule())
+        reg.register(BugcrowdUsernameModule())
+        reg.register(LaunchpadUsernameModule())
+        reg.register(AsciinemaUsernameModule())
+        reg.register(AnkiWebUsernameModule())
+        reg.register(FreeCodeCampUsernameModule())
+        reg.register(CoderwallUsernameModule())
+        reg.register(LobstersUsernameModule())
+        reg.register(ScratchUsernameModule())
+        reg.register(ExercismUsernameModule())
+        reg.register(WeblateUsernameModule())
+        reg.register(GiteaUsernameModule())
+        reg.register(SourceHutUsernameModule())
+        reg.register(PastebinUsernameModule())
+
+        # Sherlock Creative, Audio & Media Platforms (MIT)
+        reg.register(DeviantArtUsernameModule())
+        reg.register(ArtStationUsernameModule())
+        reg.register(FiveHundredPxUsernameModule())
+        reg.register(MixcloudUsernameModule())
+        reg.register(AudiomackUsernameModule())
+        reg.register(ReverbNationUsernameModule())
+        reg.register(FreesoundUsernameModule())
+        reg.register(SmugMugUsernameModule())
+        reg.register(PixivUsernameModule())
+        reg.register(WattpadUsernameModule())
+        reg.register(ArchiveOrgUsernameModule())
+        reg.register(ItchIoUsernameModule())
+        reg.register(AudioboomUsernameModule())
+        reg.register(InstructablesUsernameModule())
+        reg.register(BandcampFansUsernameModule())
+        reg.register(TraktUsernameModule())
+        reg.register(MyAnimeListUsernameModule())
+        reg.register(AniListUsernameModule())
+        reg.register(BoardGameGeekUsernameModule())
+        reg.register(ChessgamesUsernameModule())
+
+        # Sherlock Community, Forums & Gaming Platforms (MIT)
+        reg.register(QuoraUsernameModule())
+        reg.register(DiscourseMetaUsernameModule())
+        reg.register(FDroidForumUsernameModule())
+        reg.register(BitwardenForumUsernameModule())
+        reg.register(SpeedrunUsernameModule())
+        reg.register(RobloxUsernameModule())
+        reg.register(OsuUsernameModule())
+        reg.register(NameMCUsernameModule())
+        reg.register(KongregateUsernameModule())
+        reg.register(NewgroundsUsernameModule())
+        reg.register(WikiquoteUsernameModule())
+        reg.register(WiktionaryUsernameModule())
+        reg.register(WikivoyageUsernameModule())
+        reg.register(WordPressUsernameModule())
+        reg.register(BloggerUsernameModule())
+        reg.register(LiveJournalUsernameModule())
+        reg.register(TelegraphUsernameModule())
+        reg.register(VeroUsernameModule())
+        reg.register(GravatarProfileUsernameModule())
+        reg.register(OpenSeaUsernameModule())
+        reg.register(TrelloUsernameModule())
+        reg.register(SpigotMCUsernameModule())
+        reg.register(NexusModsUsernameModule())
+        reg.register(ScratchForumUsernameModule())
+        reg.register(SpeedrunWRUsernameModule())
+
         # ------------------------------------------------------------------
         # EMAIL ADAPTERS (Core & Extended)
         # ------------------------------------------------------------------
@@ -228,6 +385,9 @@ def get_default_registry() -> ModuleRegistry:
         reg.register(PgpKeyserverEmailModule())
         reg.register(CrossrefAuthorEmailModule())
         reg.register(HunterVerifierEmailModule())
+        reg.register(EmailRDAPDomainModule())
+        reg.register(EmailSecurityTxtModule())
+        reg.register(EmailCertificateTransparencyModule())
 
         # ------------------------------------------------------------------
         # PHONE ADAPTERS (Core & Extended)
@@ -237,9 +397,11 @@ def get_default_registry() -> ModuleRegistry:
         reg.register(PhoneInternationalModule())
         reg.register(PhoneCarrierPrefixModule())
         reg.register(PhoneHlrLookupModule())
+        reg.register(PhoneTimezoneModule())
+        reg.register(PhoneValidationRulesModule())
 
         # ------------------------------------------------------------------
-        # PEOPLE & PUBLIC SEARCH ADAPTERS (Core & Extended)
+        # PEOPLE & PUBLIC SCHOLAR ADAPTERS (Core & Extended)
         # ------------------------------------------------------------------
         reg.register(WikipediaPersonModule())
         reg.register(DblpAuthorModule())
@@ -247,6 +409,15 @@ def get_default_registry() -> ModuleRegistry:
         reg.register(CrossrefAuthorModule())
         reg.register(ArxivAuthorModule())
         reg.register(SearchQueryGeneratorModule())
+        reg.register(WikidataEntityModule())
+        reg.register(SemanticScholarAuthorModule())
+        reg.register(WikipediaFullTextSearchModule())
+
+        # ------------------------------------------------------------------
+        # WEB SEARCH ADAPTERS
+        # ------------------------------------------------------------------
+        reg.register(DuckDuckGoInstantModule())
+        reg.register(OpenWebSearchModule())
 
         _default_registry = reg
     return _default_registry

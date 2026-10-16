@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
-from opentrace.api.schemas.common import Confidence, InvestigationStatus
+from opentrace.api.schemas.common import Confidence, InvestigationStatus, TargetType
 from opentrace.api.schemas.finding import FindingSchema
 
 
@@ -18,6 +18,11 @@ class InvestigationRequest(BaseModel):
     email: str | None = Field(default=None, max_length=254)
     phone: str | None = Field(default=None, max_length=40)
     name: str | None = Field(default=None, max_length=120)
+    web: str | None = Field(default=None, max_length=200)
+    query: str | None = Field(default=None, max_length=200, description="Unified search query")
+    target_type: TargetType | None = Field(
+        default=None, description="Target type when query is specified"
+    )
     modules: list[str] | None = Field(
         default=None, description="Specific module or source IDs to run"
     )
@@ -43,9 +48,24 @@ class InvestigationRequest(BaseModel):
 
     @model_validator(mode="after")
     def at_least_one_target(self) -> InvestigationRequest:
-        """Ensure at least one target type is provided."""
-        if not any([self.username, self.email, self.phone, self.name]):
-            raise ValueError("At least one of username, email, phone, or name is required")
+        """Ensure at least one target type is provided, mapping unified query if given."""
+        if self.query and not any([self.username, self.email, self.phone, self.name, self.web]):
+            t_type = self.target_type or TargetType.username
+            if t_type == TargetType.username:
+                self.username = self.query
+            elif t_type == TargetType.email:
+                self.email = self.query
+            elif t_type == TargetType.phone:
+                self.phone = self.query
+            elif t_type == TargetType.name:
+                self.name = self.query
+            elif t_type == TargetType.web:
+                self.web = self.query
+
+        if not any([self.username, self.email, self.phone, self.name, self.web]):
+            raise ValueError(
+                "At least one target (username, email, phone, name, web, or query) is required"
+            )
         return self
 
 

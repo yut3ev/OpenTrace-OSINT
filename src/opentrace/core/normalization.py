@@ -107,3 +107,18 @@ def normalize_name(raw: str) -> str:
     if _NAME_DISALLOWED_RE.search(name):
         raise ValidationError("Name contains invalid symbols or control characters")
     return name
+
+
+def normalize_web(raw: str) -> str:
+    """Normalize and validate a public web search query string.
+
+    Returns cleaned, single-spaced query string. Raises ValidationError on invalid input.
+    """
+    query = " ".join(raw.strip().split())
+    if not query:
+        raise ValidationError("Web search query cannot be empty")
+    if len(query) < 2:
+        raise ValidationError("Web search query must be at least 2 characters long")
+    if len(query) > 200:
+        raise ValidationError("Web search query exceeds 200 characters")
+    return query
