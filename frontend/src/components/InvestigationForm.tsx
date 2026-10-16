@@ -65,123 +65,60 @@ export function InvestigationForm({ onSubmit, busy }: InvestigationFormProps) {
       <div className="sectionTitle">
         <span className="number">01</span>
         <div>
-          <h2>OpenTrace OSINT Engine</h2>
-          <p>Search public, authorized digital footprints across 140+ verified sources without paid APIs.</p>
+          <h2>Configure Target</h2>
+          <p>Select target vector, input identifiers, and toggle correlation pivoting.</p>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" }}>
+      <div className="form-tab-nav">
         <button
           type="button"
           onClick={() => setActiveTab("unified")}
-          style={{
-            padding: "6px 12px",
-            fontSize: "12px",
-            background: activeTab === "unified" ? "#00f0ff" : "#1a1f2c",
-            color: activeTab === "unified" ? "#0a0c10" : "#8e9bb0",
-            border: "1px solid #2d3748",
-            borderRadius: "6px",
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
+          className={`form-tab-btn ${activeTab === "unified" ? "active" : ""}`}
         >
-          <Sparkles size={12} style={{ display: "inline", marginRight: "4px" }} /> Unified Search
+          <Sparkles size={13} /> Unified Search
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("all")}
-          style={{
-            padding: "6px 12px",
-            fontSize: "12px",
-            background: activeTab === "all" ? "#00f0ff" : "#1a1f2c",
-            color: activeTab === "all" ? "#0a0c10" : "#8e9bb0",
-            border: "1px solid #2d3748",
-            borderRadius: "6px",
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
+          className={`form-tab-btn ${activeTab === "all" ? "active" : ""}`}
         >
           Multi-Field
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("username")}
-          style={{
-            padding: "6px 12px",
-            fontSize: "12px",
-            background: activeTab === "username" ? "#00f0ff" : "#1a1f2c",
-            color: activeTab === "username" ? "#0a0c10" : "#8e9bb0",
-            border: "1px solid #2d3748",
-            borderRadius: "6px",
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
+          className={`form-tab-btn ${activeTab === "username" ? "active" : ""}`}
         >
-          <User size={12} style={{ display: "inline", marginRight: "4px" }} /> Username
+          <User size={13} /> Username
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("email")}
-          style={{
-            padding: "6px 12px",
-            fontSize: "12px",
-            background: activeTab === "email" ? "#00f0ff" : "#1a1f2c",
-            color: activeTab === "email" ? "#0a0c10" : "#8e9bb0",
-            border: "1px solid #2d3748",
-            borderRadius: "6px",
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
+          className={`form-tab-btn ${activeTab === "email" ? "active" : ""}`}
         >
-          <Mail size={12} style={{ display: "inline", marginRight: "4px" }} /> Email
+          <Mail size={13} /> Email
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("phone")}
-          style={{
-            padding: "6px 12px",
-            fontSize: "12px",
-            background: activeTab === "phone" ? "#00f0ff" : "#1a1f2c",
-            color: activeTab === "phone" ? "#0a0c10" : "#8e9bb0",
-            border: "1px solid #2d3748",
-            borderRadius: "6px",
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
+          className={`form-tab-btn ${activeTab === "phone" ? "active" : ""}`}
         >
-          <Phone size={12} style={{ display: "inline", marginRight: "4px" }} /> Phone
+          <Phone size={13} /> Phone
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("name")}
-          style={{
-            padding: "6px 12px",
-            fontSize: "12px",
-            background: activeTab === "name" ? "#00f0ff" : "#1a1f2c",
-            color: activeTab === "name" ? "#0a0c10" : "#8e9bb0",
-            border: "1px solid #2d3748",
-            borderRadius: "6px",
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
+          className={`form-tab-btn ${activeTab === "name" ? "active" : ""}`}
         >
-          <Search size={12} style={{ display: "inline", marginRight: "4px" }} /> Name / Scholar
+          <Search size={13} /> Name / Scholar
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("web")}
-          style={{
-            padding: "6px 12px",
-            fontSize: "12px",
-            background: activeTab === "web" ? "#00f0ff" : "#1a1f2c",
-            color: activeTab === "web" ? "#0a0c10" : "#8e9bb0",
-            border: "1px solid #2d3748",
-            borderRadius: "6px",
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
+          className={`form-tab-btn ${activeTab === "web" ? "active" : ""}`}
         >
-          <Globe size={12} style={{ display: "inline", marginRight: "4px" }} /> Web Search
+          <Globe size={13} /> Web Search
         </button>
       </div>
 

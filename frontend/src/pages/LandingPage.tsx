@@ -1,3 +1,19 @@
+import { 
+  UserCheck, 
+  Mail, 
+  PhoneCall, 
+  GraduationCap, 
+  ShieldCheck, 
+  Zap, 
+  ArrowRight, 
+  Activity, 
+  Database, 
+  CheckCircle2, 
+  Lock, 
+  Search,
+  Sparkles
+} from "lucide-react";
+import { IntelGraphHero } from "../components/IntelGraphHero";
 import type { PlatformStats, User } from "../types";
 
 interface LandingPageProps {
@@ -17,70 +33,128 @@ export function LandingPage({
 
   return (
     <div className="landing-page">
-      {/* Hero Section */}
-      <section className="hero-section">
-        <div className="hero-badge">
-          <span className="pulse-dot"></span> OpenTrace OSINT v0.1 · 100% Free & Open Source
-        </div>
-        <h1 className="hero-title">
-          Unified Digital Footprint Intelligence & OSINT Search Engine
-        </h1>
-        <p className="hero-subtitle">
-          Query {activeCount}+ active, genuinely usable public platforms in parallel.
-          Verify digital footprints across social networks, developer hubs, email records,
-          and public registries—with strictly zero paid API keys or subscriptions required.
-        </p>
+      {/* Redesigned 2-Column Hero Section */}
+      <section className="hero-grid-section">
+        <div className="hero-content">
+          <div className="hero-badge">
+            <span className="pulse-dot"></span>
+            <span className="badge-text">LIVE OSINT RECONNAISSANCE ENGINE · v0.1 PRODUCTION</span>
+          </div>
 
-        <div className="hero-actions">
-          <button className="btn-primary hero-btn" onClick={onStartSearch}>
-            Launch Search Console
-          </button>
-          {!currentUser ? (
-            <button
-              className="btn-secondary hero-btn"
-              onClick={() => onOpenAuth("register")}
-            >
-              Create Free Account
+          <h1 className="hero-title">
+            Global Multi-Source OSINT & Digital Footprint Intelligence
+          </h1>
+
+          <p className="hero-subtitle">
+            Interrogate {activeCount}+ public intelligence platforms simultaneously. Discover
+            digital footprints across social networks, developer hubs, telephony registries, and
+            scholarly archives—with strictly zero paid API keys or recurring subscriptions.
+          </p>
+
+          <div className="hero-actions">
+            <button className="btn-primary hero-btn primary-glow" onClick={onStartSearch}>
+              <Search size={18} />
+              <span>Launch Search Console</span>
+              <ArrowRight size={16} />
             </button>
-          ) : (
-            <span className="signed-in-notice">
-              Logged in as <strong>{currentUser.name}</strong> ({currentUser.email})
-            </span>
-          )}
+            {!currentUser ? (
+              <button
+                className="btn-secondary hero-btn"
+                onClick={() => onOpenAuth("register")}
+              >
+                <Lock size={16} />
+                <span>Create Free Account</span>
+              </button>
+            ) : (
+              <div className="signed-in-pill">
+                <span className="pill-dot"></span>
+                <span>Active session: <strong>{currentUser.name}</strong></span>
+              </div>
+            )}
+          </div>
+
+          {/* Quick verification micro badges */}
+          <div className="hero-trust-row">
+            <div className="trust-item">
+              <CheckCircle2 size={14} className="text-emerald" />
+              <span>100% Free Public Sources</span>
+            </div>
+            <div className="trust-item">
+              <ShieldCheck size={14} className="text-cyan" />
+              <span>Strict Anti-SSRF Safe</span>
+            </div>
+            <div className="trust-item">
+              <Lock size={14} className="text-violet" />
+              <span>Isolated Tenant Storage</span>
+            </div>
+          </div>
         </div>
 
-        <div className="hero-stats-banner">
-          <div className="stat-box">
-            <span className="stat-number">{activeCount}</span>
-            <span className="stat-label">Active Source Adapters</span>
-          </div>
-          <div className="stat-box">
-            <span className="stat-number">100%</span>
-            <span className="stat-label">Free-Tier Ready</span>
-          </div>
-          <div className="stat-box">
-            <span className="stat-number">$0</span>
-            <span className="stat-label">API Cost / Subscriptions</span>
-          </div>
-          <div className="stat-box">
-            <span className="stat-number">Strict</span>
-            <span className="stat-label">Privacy & Isolation</span>
-          </div>
+        {/* Right Column: Interactive Intelligence Graph */}
+        <div className="hero-visual-wrapper">
+          <IntelGraphHero />
         </div>
       </section>
 
-      {/* Feature Capabilities Grid */}
+      {/* Global High-Impact Stats Banner */}
+      <section className="hero-stats-banner">
+        <div className="stat-box">
+          <div className="stat-header">
+            <Activity size={18} className="text-cyan" />
+            <span className="stat-number">{activeCount}</span>
+          </div>
+          <span className="stat-label">Active Source Adapters</span>
+          <span className="stat-desc">Fully tested & operational</span>
+        </div>
+
+        <div className="stat-box">
+          <div className="stat-header">
+            <Database size={18} className="text-emerald" />
+            <span className="stat-number">100%</span>
+          </div>
+          <span className="stat-label">Free-Tier Ready</span>
+          <span className="stat-desc">512MB RAM bounded execution</span>
+        </div>
+
+        <div className="stat-box">
+          <div className="stat-header">
+            <Sparkles size={18} className="text-amber" />
+            <span className="stat-number">$0</span>
+          </div>
+          <span className="stat-label">API Cost / Subscriptions</span>
+          <span className="stat-desc">Zero mandatory paid keys</span>
+        </div>
+
+        <div className="stat-box">
+          <div className="stat-header">
+            <Lock size={18} className="text-violet" />
+            <span className="stat-number">Isolated</span>
+          </div>
+          <span className="stat-label">Privacy & Tenancy</span>
+          <span className="stat-desc">Owner cryptographic protection</span>
+        </div>
+      </section>
+
+      {/* Feature Capabilities Grid with Modern Icons & Tags */}
       <section className="section-features">
         <div className="section-header">
-          <h2>Engine Capabilities</h2>
+          <div className="section-eyebrow">
+            <ShieldCheck size={14} /> INTELLIGENCE SUITE
+          </div>
+          <h2>Multi-Vector Intelligence Capabilities</h2>
           <p>
-            Evidence-first intelligence designed for researchers, security analysts, and investigators.
+            Evidence-first intelligence designed for security analysts, incident responders, and OSINT researchers.
           </p>
         </div>
 
         <div className="features-grid">
           <div className="feature-card">
-            <div className="feature-icon">🔍</div>
+            <div className="feature-card-header">
+              <div className="feature-icon-badge icon-cyan">
+                <UserCheck size={22} />
+              </div>
+              <span className="feature-category-pill">118+ NETWORKS</span>
+            </div>
             <h3>Multi-Source Username Discovery</h3>
             <p>
               Simultaneously interrogates 118+ online services—from GitHub, Reddit, and Steam to Mastodon,
@@ -89,7 +163,12 @@ export function LandingPage({
           </div>
 
           <div className="feature-card">
-            <div className="feature-icon">✉️</div>
+            <div className="feature-card-header">
+              <div className="feature-icon-badge icon-emerald">
+                <Mail size={22} />
+              </div>
+              <span className="feature-category-pill">DNS & KEYRINGS</span>
+            </div>
             <h3>Email Intelligence & DNS Records</h3>
             <p>
               Inspects Gravatar avatars, OpenPGP public keyrings, Mail.ru profiles, disposable provider
@@ -98,7 +177,12 @@ export function LandingPage({
           </div>
 
           <div className="feature-card">
-            <div className="feature-icon">📞</div>
+            <div className="feature-card-header">
+              <div className="feature-icon-badge icon-amber">
+                <PhoneCall size={22} />
+              </div>
+              <span className="feature-category-pill">E.164 TELEPHONY</span>
+            </div>
             <h3>Phone & Carrier Metadata</h3>
             <p>
               Validates numbers against international E.164 specifications, detects geographic
@@ -107,7 +191,12 @@ export function LandingPage({
           </div>
 
           <div className="feature-card">
-            <div className="feature-icon">🎓</div>
+            <div className="feature-card-header">
+              <div className="feature-icon-badge icon-violet">
+                <GraduationCap size={22} />
+              </div>
+              <span className="feature-category-pill">ACADEMIC & CITATIONS</span>
+            </div>
             <h3>Scholarly & People Lookup</h3>
             <p>
               Cross-references academic citations, ORCID identifiers, arXiv preprints, CrossRef metadata,
@@ -116,7 +205,12 @@ export function LandingPage({
           </div>
 
           <div className="feature-card">
-            <div className="feature-icon">🛡️</div>
+            <div className="feature-card-header">
+              <div className="feature-icon-badge icon-teal">
+                <ShieldCheck size={22} />
+              </div>
+              <span className="feature-category-pill">ZERO LEAKAGE</span>
+            </div>
             <h3>Strict Privacy & Isolation</h3>
             <p>
               Every investigation is strictly isolated to its owner. Zero cross-user data leakage,
@@ -125,7 +219,12 @@ export function LandingPage({
           </div>
 
           <div className="feature-card">
-            <div className="feature-icon">⚡</div>
+            <div className="feature-card-header">
+              <div className="feature-icon-badge icon-rose">
+                <Zap size={22} />
+              </div>
+              <span className="feature-category-pill">STREAMING TELEMETRY</span>
+            </div>
             <h3>Live SSE Streaming & Retries</h3>
             <p>
               Streams finding events directly to your browser via Server-Sent Events. Failed or rate-limited
@@ -139,21 +238,49 @@ export function LandingPage({
       <section className="section-free-tier">
         <div className="free-tier-card">
           <div className="free-tier-content">
-            <h2>Built Specifically for Free-Tier Deployment</h2>
+            <div className="free-tier-badge">
+              <CheckCircle2 size={14} /> PRODUCTION VERIFIED SPECIFICATION
+            </div>
+            <h2>Engineered Exclusively for Free-Tier Cloud Deployment</h2>
             <p>
-              OpenTrace is engineered from the ground up to operate reliably on free cloud hosting
+              OpenTrace is architected from the ground up to operate reliably on free cloud tiers
               (Render, Railway, Fly.io, Vercel) within strict memory and timeout constraints.
             </p>
-            <ul className="free-tier-list">
-              <li>✓ No paid third-party dependencies or surprise usage fees</li>
-              <li>✓ Bounded concurrency preventing memory exhaustion on 512MB RAM containers</li>
-              <li>✓ SQLite default database with zero external server management overhead</li>
-              <li>✓ Anti-SSRF guards preventing outbound abuse to internal private networks</li>
-            </ul>
+            <div className="free-tier-grid">
+              <div className="free-tier-item">
+                <CheckCircle2 size={16} className="text-emerald" />
+                <div>
+                  <strong>Zero Paid Dependencies</strong>
+                  <p>Operates 100% on public endpoints and authorized free registries.</p>
+                </div>
+              </div>
+              <div className="free-tier-item">
+                <CheckCircle2 size={16} className="text-emerald" />
+                <div>
+                  <strong>Bounded Concurrency</strong>
+                  <p>Guards against memory spikes, remaining strictly below 512MB RAM.</p>
+                </div>
+              </div>
+              <div className="free-tier-item">
+                <CheckCircle2 size={16} className="text-emerald" />
+                <div>
+                  <strong>Embedded Persistence</strong>
+                  <p>Zero external DB server requirements: SQLite by default with Postgres support.</p>
+                </div>
+              </div>
+              <div className="free-tier-item">
+                <CheckCircle2 size={16} className="text-emerald" />
+                <div>
+                  <strong>Anti-SSRF Protection</strong>
+                  <p>Blocks any internal private network requests or cloud metadata probing.</p>
+                </div>
+              </div>
+            </div>
           </div>
           <div className="free-tier-action">
-            <button className="btn-primary" onClick={onStartSearch}>
-              Start Investigating Now
+            <button className="btn-primary primary-glow" onClick={onStartSearch}>
+              <span>Start Investigating Now</span>
+              <ArrowRight size={16} />
             </button>
           </div>
         </div>

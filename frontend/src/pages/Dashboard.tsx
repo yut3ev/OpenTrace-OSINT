@@ -50,23 +50,26 @@ export function Dashboard({
 
   return (
     <>
-      <section className="hero">
-        <div>
-          <span className="overline">
-            <ShieldCheck size={15} /> EVIDENCE FIRST · PRIVACY AWARE
-          </span>
+      <section className="console-hero-banner">
+        <div className="console-banner-content">
+          <div className="console-overline">
+            <ShieldCheck size={14} className="text-cyan" />
+            <span>OPERATIONAL RECONNAISSANCE CONSOLE · EVIDENCE FIRST</span>
+          </div>
           <h2>
-            Investigate signals.<br />
-            <em>Preserve the evidence.</em>
+            Investigate signals. <em>Preserve the evidence.</em>
           </h2>
           <p>
-            Run transparent checks against 25+ configured public sources. A result is a lead,
-            not proof of identity.
+            Run bounded asynchronous queries across {enabledCount || 149} verified public sources.
+            Findings represent corroborated public indicators for investigation leads.
           </p>
         </div>
-        <div className="heroStat">
-          <Activity size={22} />
-          <strong>{enabledCount}</strong>
+        <div className="console-stat-box">
+          <div className="console-stat-header">
+            <Activity size={20} className="text-emerald" />
+            <span className="live-pulse"></span>
+          </div>
+          <strong>{enabledCount || 149}</strong>
           <span>operational modules</span>
         </div>
       </section>
