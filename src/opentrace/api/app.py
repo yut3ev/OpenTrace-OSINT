@@ -38,14 +38,51 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    settings = get_settings()
+
     # CORS configuration
+    configured_origins = settings.cors_origins
+    allow_credentials = "*" not in configured_origins
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
+        allow_origins=configured_origins if configured_origins else ["*"],
+        allow_credentials=allow_credentials,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # API key authentication middleware
+    @app.middleware("http")
+    async def api_key_auth_middleware(request: Request, call_next) -> Response:  # type: ignore[no-untyped-def]
+        if request.method == "OPTIONS":
+            res_opt: Response = await call_next(request)
+            return res_opt
+
+        path = request.url.path
+        public_paths = {"/health", "/api/v1/health", "/docs", "/redoc", "/openapi.json"}
+        if path in public_paths or path.startswith("/docs") or path.startswith("/redoc"):
+            res_pub: Response = await call_next(request)
+            return res_pub
+
+        current_settings = get_settings()
+        if current_settings.api_key:
+            auth_header = request.headers.get("Authorization")
+            api_key_header = request.headers.get("X-API-Key")
+
+            provided_key = api_key_header
+            if not provided_key and auth_header and auth_header.startswith("Bearer "):
+                provided_key = auth_header[7:].strip()
+
+            if not provided_key or provided_key != current_settings.api_key:
+                from fastapi.responses import JSONResponse
+
+                return JSONResponse(
+                    status_code=401,
+                    content={"error": "Unauthorized: invalid or missing API key"},
+                )
+
+        res_next: Response = await call_next(request)
+        return res_next
 
     # Request ID middleware
     @app.middleware("http")

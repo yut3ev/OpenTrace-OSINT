@@ -159,11 +159,31 @@ class BoundedScheduler:
                 "confidence": "none",
                 "data": {"error": str(exc)},
             }
-            return mod_id, [error_finding], "failed"
+            return mod_id, [error_finding], "error"
 
     async def execute_tasks(
-        self, tasks: list[tuple[OSINTModule, str, dict[str, Any]]]
+        self,
+        tasks: list[tuple[OSINTModule, str, dict[str, Any]]],
+        on_result: Any = None,
     ) -> list[tuple[str, list[dict[str, Any]], str]]:
-        """Run multiple module tasks concurrently within bounds."""
-        futures = [self.run_single_module(module, target, ctx) for module, target, ctx in tasks]
+        """Run multiple module tasks concurrently within bounds.
+
+        If `on_result` is provided, it is invoked immediately as each module finishes
+        with (mod_id, findings, status_str), allowing real-time partial result accumulation.
+        """
+
+        async def _run_with_callback(
+            module: OSINTModule, target: str, ctx: dict[str, Any]
+        ) -> tuple[str, list[dict[str, Any]], str]:
+            res = await self.run_single_module(module, target, ctx)
+            if on_result is not None:
+                try:
+                    on_result(res[0], res[1], res[2])
+                except Exception:
+                    logger.exception(
+                        "Error in scheduler on_result callback for module '%s'", res[0]
+                    )
+            return res
+
+        futures = [_run_with_callback(module, target, ctx) for module, target, ctx in tasks]
         return await asyncio.gather(*futures)

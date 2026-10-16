@@ -10,12 +10,14 @@ from opentrace.modules.base import OSINTModule
 from opentrace.modules.email.disposable import DisposableEmailModule
 from opentrace.modules.email.dns import EmailDNSModule
 from opentrace.modules.email.gravatar import GravatarEmailModule
+from opentrace.modules.email.hibp import HaveIBeenPwnedEmailModule
 from opentrace.modules.email.security import EmailSecurityModule
 from opentrace.modules.email.syntax import EmailSyntaxModule
 from opentrace.modules.people.dblp import DblpAuthorModule
 from opentrace.modules.people.openalex import OpenAlexAuthorModule
 from opentrace.modules.people.wikipedia import WikipediaPersonModule
 from opentrace.modules.phone.numbering import PhoneNumberingModule
+from opentrace.modules.phone.provider import AuthorizedPhoneLookupModule
 from opentrace.modules.usernames.developer import (
     BitbucketUsernameModule,
     DevToUsernameModule,
@@ -109,9 +111,11 @@ def get_default_registry() -> ModuleRegistry:
         reg.register(DisposableEmailModule())
         reg.register(GravatarEmailModule())
         reg.register(EmailSecurityModule())
+        reg.register(HaveIBeenPwnedEmailModule())
 
         # Phone modules
         reg.register(PhoneNumberingModule())
+        reg.register(AuthorizedPhoneLookupModule())
 
         # People / Name modules
         reg.register(WikipediaPersonModule())

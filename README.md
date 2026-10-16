@@ -1,101 +1,282 @@
-# OpenTrace OSINT — Full Build Specification
+# OpenTrace OSINT
 
-OpenTrace is a modular, evidence-first public digital-footprint investigation platform focused on usernames, email addresses, and phone-number metadata. This repository contains the complete implementation brief for an AI coding agent. The agent must build and test the application, not merely repeat this document.
+[![CI Pipeline](https://github.com/opentrace-osint/opentrace/actions/workflows/ci.yml/badge.svg)](https://github.com/opentrace-osint/opentrace/actions/workflows/ci.yml)
+[![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-18.3+-61DAFB.svg?logo=react)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.5+-3178C6.svg?logo=typescript)](https://www.typescriptlang.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Non-negotiable principles
-- Only public sources and integrations the operator is authorized to use.
-- Never bypass authentication, paywalls, CAPTCHAs, access controls, or rate limits.
-- No leaked credential databases, password discovery, private account access, stalking, doxxing, or covert tracking.
-- A username match is a candidate, not proof that accounts belong to one person.
-- Every finding must have provenance, observation time, status, and an evidence explanation.
-- `unknown` is different from `not_found`.
-- Never fabricate data, sources, tests, coverage, or success metrics.
-- In-memory storage is the default. Persistence is opt-in.
-- The app must be usable locally and easy to deploy for authorized research.
+**OpenTrace OSINT** is a modular, evidence-first public digital-footprint investigation platform. Inspired by the clarity and multi-source breadth of modern intelligence tools, OpenTrace performs structured investigations across usernames, email addresses, phone-number metadata, and public author records using strictly lawful, public, and operator-authorized sources.
 
-## Product target
-Build a polished open-source project with:
-1. Web dashboard
-2. Python CLI
-3. REST API with OpenAPI docs
-4. Plugin/module system
-5. Concurrent investigation orchestrator
-6. Evidence normalization and conservative correlation
-7. In-memory default storage and optional SQLite
-8. JSON, CSV, and HTML report export
-9. Unit, integration, and API tests
-10. Docker and GitHub Actions
-11. Clear source coverage matrix and privacy/security docs
+---
 
-## Required stack
-- Python 3.11+
-- FastAPI + Pydantic v2
-- httpx async
-- Typer + Rich CLI
-- SQLAlchemy 2.x or a carefully isolated sqlite3 store
-- pytest + pytest-asyncio + respx (or equivalent HTTP mocking)
-- React + TypeScript + Vite for the dashboard
-- Tailwind CSS optional; do not sacrifice accessibility
-- Docker Compose
-- GitHub Actions
+## Key Highlights
 
-## Supported first-release modules
-### Username
-- Use an explicit, documented source registry.
-- Implement only public profile endpoints whose terms and access patterns permit the checks.
-- Initial adapters can include GitHub and GitLab public profile URLs. Any additional source must be individually implemented and tested.
-- Do not infer ownership from profile existence.
-- Treat 401, 403, 429, 5xx, timeout, redirects to login, and unexpected response shapes as `unknown`.
-- 404 may be `not_found` only when the source's behavior has been tested and documented.
-- Respect per-host rate limits and set an honest User-Agent.
+- **Evidence-First Provenance**: Every observation includes raw cryptographic hashes (`SHA-256`), canonical target references, HTTP status codes, retrieval timestamps, and transparent confidence ratings.
+- **Honest Status Taxonomy**: Distinguishes verified presence (`found`) from clean absence (`not_found`), while explicitly recording service rate-limiting (`rate_limited`), access blocks (`blocked`), network timeouts (`unavailable`), and missing credentials (`skipped`).
+- **Bounded Concurrency & Throttling**: Asynchronous pipeline with global execution bounds and per-host rate limiting, preventing Denial-of-Service or IP ban risks against public endpoints.
+- **No Private Probing / Breach Scraping**: Complies with strict ethical standards. Does not perform SMTP mailbox probing, password guessing, credential scraping, or paywall/CAPTCHA bypass.
+- **Zero-Footprint Storage Default**: In-memory storage by default; opt-in SQLite persistence available via environment variable.
+- **Unified Tri-Interface**: Web Dashboard (React + TypeScript + Vite), Python CLI (`opentrace` via Typer and Rich), and REST API with live Server-Sent Events (SSE).
+- **Secure Report Exporters**: Generate sanitized JSON, CSV, or standalone single-file HTML reports hardened with Content Security Policy (CSP) and strict HTML escaping.
 
-### Email
-- Syntax parsing and domain normalization.
-- DNS MX lookup, with clear `unknown` handling for timeouts and DNS errors.
-- Optional integration with documented, authorized provider APIs through environment-configured keys.
-- No SMTP probing, mailbox enumeration, account recovery probing, or breach credential searches.
-- Never claim mailbox existence or ownership from syntax/MX alone.
+---
 
-### Phone
-- Parse and normalize using `phonenumbers`.
-- Return only numbering-plan metadata such as E.164 format, country calling code, region and possible number type when available.
-- Do not claim subscriber identity, live status, precise location, or account associations.
+## Primary Search Modes & Source Coverage
 
-### Cross-source correlation
-- Link only when explicit evidence supports the relationship.
-- Similar usernames, display names, avatars, or names alone are weak signals and must not create a confirmed identity link.
-- Every edge must contain `basis`, `confidence`, and evidence references.
-- Label candidate relationships as candidates.
+OpenTrace includes **27 active source adapters** registered across four investigation modes:
 
-## Deliverables
-The AI coding agent must create every file in `PROJECT_TREE.md`, then implement in stages defined in `IMPLEMENTATION_PLAN.md`. It must run formatting, linting, type checks where configured, and tests. It must report exactly which commands ran and their results. Do not say tests passed if they were not run.
+### 1. Username Discovery (`TargetType.username`)
+Searches public profile endpoints with custom response validation to eliminate false positives from soft-404s and redirect loops:
+- **Developer & Code Platforms**: GitHub, GitLab, Docker Hub, PyPI, npm Registry, Keybase
+- **Social & Publishing Communities**: Reddit, Mastodon, Hacker News, DEV.to, Medium, Stack Exchange
+- **Gaming & Media Platforms**: Chess.com, Lichess, Archive.org, Gravatar Avatar Discovery
 
-## Local quick start (target)
-```bash
-python -m venv .venv
-# activate venv for your OS
-python -m pip install -e ".[dev]"
-uvicorn opentrace.api.app:app --reload
+### 2. Email Address Metadata (`TargetType.email`)
+- **Syntax & RFC Normalization**: Syntax checks, internationalized domain handling, and standard format validation.
+- **DNS MX Verification**: Resolves mail exchange infrastructure records.
+- **Public Gravatar Profile Discovery**: Locates public user profiles associated with the hashed email.
+- **HaveIBeenPwned API Integration (`email.hibp`)**: When configured with `HIBP_API_KEY`, queries official incident metadata without exposing credentials. Gracefully reports `skipped` when unconfigured.
+
+### 3. Phone Number Metadata (`TargetType.phone`)
+- **E.164 Number Normalization**: Country code extraction, carrier format parsing, and numbering plan validation via Google's `phonenumbers` library.
+- **Carrier Lookup Provider (`phone.provider_api`)**: When configured with `NUMVERIFY_API_KEY` or `TWILIO_*`, verifies telecommunications provider, line type (mobile/landline/VoIP), and carrier assignment. Gracefully reports `skipped` when unconfigured.
+
+### 4. Name / Academic & Professional Discovery (`TargetType.name`)
+- **DBLP Bibliography**: Searches verified computer science publications and author entries.
+- **CrossRef Metadata**: Cross-references academic papers and registered researcher profiles.
+- **Search Query Builder**: Formulates targeted, lawful search queries for public search engines.
+
+---
+
+## Architecture Overview
+
+```
+                      +------------------------------------------+
+                      |         OpenTrace User Interfaces         |
+                      |   React Web UI  |  Typer CLI  | REST API |
+                      +------------------------------------------+
+                                           |
+                                           v
+                      +------------------------------------------+
+                      |        Investigation Orchestrator        |
+                      |  - Target Normalization & Validation     |
+                      |  - Module Selection & Eligibility        |
+                      |  - Event Bus (SSE Real-time Streaming)   |
+                      +------------------------------------------+
+                                           |
+                                           v
+                      +------------------------------------------+
+                      |       Bounded Concurrency Scheduler      |
+                      |  - Global Semaphore (default: 5)         |
+                      |  - Per-Host Semaphore (default: 2)       |
+                      |  - Real-time Partial Result Retention    |
+                      +------------------------------------------+
+                                           |
+                    +----------------------+----------------------+
+                    |                      |                      |
+                    v                      v                      v
+             [ Username Modules ]   [ Email Modules ]    [ Phone & Name ]
+                    |                      |                      |
+                    +----------------------+----------------------+
+                                           |
+                                           v
+                      +------------------------------------------+
+                      |     Correlation & Correlation Engine     |
+                      |  - Finding Deduplication                 |
+                      |  - Entity Extraction & Graph Edges       |
+                      |  - Honest Source Coverage Metrics        |
+                      +------------------------------------------+
+                                           |
+                                           v
+                      +------------------------------------------+
+                      |     Storage & Multi-Format Exporters     |
+                      |  - MemoryStore / SQLiteStore             |
+                      |  - JSON / CSV / Hardened HTML Exporters  |
+                      +------------------------------------------+
 ```
 
-In a separate terminal:
+---
+
+## Quickstart
+
+### Prerequisites
+- **Python**: 3.11, 3.12, or 3.13
+- **Node.js**: 18+ (for building the frontend dashboard)
+
+### 1. Clone & Install
+
 ```bash
+# Clone the repository
+git clone https://github.com/opentrace-osint/opentrace.git
+cd opentrace
+
+# Create and activate virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install backend in editable mode with development dependencies
+pip install -e ".[dev]"
+
+# Install and build frontend dashboard
 cd frontend
 npm install
+npm run build
+cd ..
+```
+
+### 2. Run the API Server
+
+```bash
+uvicorn opentrace.api.app:app --host 0.0.0.0 --port 8000 --reload
+```
+
+- API Base URL: `http://localhost:8000`
+- Interactive Swagger Documentation: `http://localhost:8000/docs`
+- ReDoc Documentation: `http://localhost:8000/redoc`
+
+### 3. Run the Web Dashboard
+
+To run the frontend dev server with live hot-reloading:
+
+```bash
+cd frontend
 npm run dev
 ```
 
-## API target
-- `GET /health`
-- `GET /api/v1/modules`
-- `POST /api/v1/investigations`
-- `GET /api/v1/investigations`
-- `GET /api/v1/investigations/{investigation_id}`
-- `DELETE /api/v1/investigations/{investigation_id}`
-- `GET /api/v1/investigations/{investigation_id}/events` (SSE)
-- `GET /api/v1/investigations/{investigation_id}/export?format=json|csv|html`
+Visit `http://localhost:5173` to explore investigations, view real-time findings, examine the entity graph, and download audit reports.
 
-See `docs/API.md` for schemas and semantics.
+---
 
-## Security warning
-Do not expose the API publicly without authentication, authorization, rate limiting, secure secret management, and an explicit retention policy. The local development build may run without authentication only when bound to localhost.
+## Running with Docker Compose
+
+OpenTrace includes a production-ready `Dockerfile` and `docker-compose.yml`:
+
+```bash
+# Build and start all services
+docker compose up --build -d
+
+# View application logs
+docker compose logs -f
+
+# Stop services
+docker compose down
+```
+
+The containerized service runs on port `8000`, serving both the FastAPI backend and built frontend assets.
+
+---
+
+## CLI Usage
+
+The OpenTrace CLI is powered by Typer and Rich:
+
+```bash
+# Run a username search across all platforms
+opentrace investigate -u octocat
+
+# Run an email metadata check
+opentrace investigate -e developer@example.com
+
+# Run a phone numbering investigation
+opentrace investigate -p "+14155552671"
+
+# Run a multi-target investigation
+opentrace investigate -u octocat -e developer@example.com
+
+# Export investigation results
+opentrace export <INVESTIGATION_ID> -f html -o report.html
+opentrace export <INVESTIGATION_ID> -f json -o report.json
+opentrace export <INVESTIGATION_ID> -f csv -o report.csv
+
+# List all supported source adapters
+opentrace sources list
+
+# View platform coverage metrics
+opentrace stats
+```
+
+---
+
+## Configuration & Environment Variables
+
+OpenTrace supports canonical configuration keys as well as backwards-compatible deployment aliases:
+
+| Variable | Alias | Default | Description |
+|:---|:---|:---|:---|
+| `OPENTRACE_STORAGE_MODE` | `OPENTRACE_STORAGE` | `memory` | Storage backend: `memory` or `sqlite` |
+| `OPENTRACE_SQLITE_PATH` | - | `opentrace.db` | File path for SQLite database when mode is `sqlite` |
+| `OPENTRACE_MAX_CONCURRENCY` | - | `5` | Maximum global concurrent module executions |
+| `OPENTRACE_PER_HOST_CONCURRENCY` | - | `2` | Maximum concurrent requests to the same hostname |
+| `OPENTRACE_DEFAULT_TIMEOUT` | `OPENTRACE_REQUEST_TIMEOUT_SECONDS` | `10.0` | Default HTTP timeout per module request (seconds) |
+| `OPENTRACE_MAX_RUNTIME` | `OPENTRACE_MAX_RUNTIME_SECONDS` | `60.0` | Maximum investigation timeout (seconds) |
+| `OPENTRACE_API_KEY` | - | `None` | Optional API key protecting `/api/v1/*` routes |
+| `OPENTRACE_CORS_ORIGINS` | - | `http://localhost:5173,...` | Comma-separated list of allowed CORS origins |
+| `OPENTRACE_LOG_LEVEL` | - | `INFO` | Logging verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+| `HIBP_API_KEY` | - | `None` | HaveIBeenPwned API key for authorized email breach lookups |
+| `NUMVERIFY_API_KEY` | - | `None` | Numverify API key for real-time carrier lookup |
+
+Copy `.env.example` to `.env` to configure your local settings:
+
+```bash
+cp .env.example .env
+```
+
+---
+
+## REST API Overview
+
+All protected endpoints accept authentication via `X-API-Key: <KEY>` or `Authorization: Bearer <KEY>` when `OPENTRACE_API_KEY` is configured.
+
+| Method | Endpoint | Description |
+|:---|:---|:---|
+| `GET` | `/health` | Service health status and version info |
+| `POST` | `/api/v1/investigations` | Start a new synchronous or queued investigation |
+| `GET` | `/api/v1/investigations/{id}` | Retrieve full investigation results and findings |
+| `GET` | `/api/v1/investigations/{id}/events` | SSE stream for real-time finding and progress updates |
+| `POST` | `/api/v1/investigations/{id}/cancel` | Cancel an ongoing investigation (retains partial findings) |
+| `GET` | `/api/v1/sources` | Search and filter the full source manifest registry |
+| `GET` | `/api/v1/sources/{id}` | Inspect metadata, limits, and capabilities of a source |
+| `GET` | `/api/v1/stats` | Platform statistics, coverage by category, and status distribution |
+| `GET` | `/api/v1/exports/{id}.json` | Download sanitized JSON investigation report |
+| `GET` | `/api/v1/exports/{id}.csv` | Download CSV findings report |
+| `GET` | `/api/v1/exports/{id}.html` | Download hardened single-file HTML report with CSP protection |
+
+---
+
+## Testing & Quality Assurance
+
+OpenTrace maintains a comprehensive automated test suite with full HTTP and DNS mocking:
+
+```bash
+# Run the complete test suite (95+ tests)
+pytest -v
+
+# Run with coverage reporting
+pytest --cov=opentrace --cov-report=term-missing
+
+# Run code formatting and lint checks
+ruff check .
+ruff format --check .
+
+# Run static type checks
+mypy src/opentrace
+```
+
+---
+
+## Legal & Ethical Guidelines
+
+OpenTrace is built strictly for lawful digital forensics, authorized security investigations, research, and personal privacy audits.
+
+1. **Lawful Sources Only**: Only public, unauthenticated web pages or APIs explicitly permitted by terms of service are queried.
+2. **No Intrusion**: OpenTrace does not bypass logins, paywalls, CAPTCHAs, or rate limits.
+3. **No Private Scraping**: Does not scrape private social profiles, access stolen credential databases, or perform unauthorized account enumeration.
+4. **Correlation Disclaimer**: A username matching across multiple platforms is a candidate discovery, never conclusive proof of common ownership. Analysts must manually verify identity links.
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

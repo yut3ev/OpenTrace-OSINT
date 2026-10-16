@@ -142,6 +142,78 @@ class InvestigationOrchestrator:
 
         return selected, warnings
 
+    def _calculate_metrics(
+        self,
+        module_pairs: list[tuple[OSINTModule, TargetType]],
+        module_statuses: dict[str, str],
+        all_findings: list[dict[str, Any]],
+    ) -> SourceMetrics:
+        """Compute honest coverage metrics without misclassifying errors/timeouts as no_match."""
+        metrics = SourceMetrics(
+            registered=len(self.registry.list_all()),
+            eligible=len(module_pairs),
+            attempted=len(module_statuses),
+        )
+        for mod_id, status_str in module_statuses.items():
+            mod_findings = [
+                f
+                for f in all_findings
+                if f.get("module_id") == mod_id or f.get("source_id") == mod_id
+            ]
+
+            # 1. Check for explicit source_status in findings
+            explicit_status = None
+            for f in mod_findings:
+                if f.get("source_status"):
+                    explicit_status = f.get("source_status")
+                    break
+
+            if explicit_status:
+                st_val = (
+                    explicit_status.value
+                    if hasattr(explicit_status, "value")
+                    else str(explicit_status).lower()
+                )
+            else:
+                # 2. Derive status conservatively
+                if status_str == "timeout":
+                    st_val = "unavailable"
+                elif status_str in ("error", "failed"):
+                    st_val = "error"
+                elif status_str == "skipped":
+                    st_val = "skipped"
+                elif any(f.get("status") in ["found", "info"] for f in mod_findings):
+                    st_val = "succeeded"
+                elif any(f.get("status") == "error" for f in mod_findings):
+                    st_val = "error"
+                elif any(f.get("status") == "unknown" for f in mod_findings):
+                    st_val = "unavailable"
+                elif any(f.get("status") == "skipped" for f in mod_findings):
+                    st_val = "skipped"
+                elif any(f.get("status") == "no_match" for f in mod_findings):
+                    st_val = "no_match"
+                elif status_str == "completed":
+                    st_val = "no_match"
+                else:
+                    st_val = "error"
+
+            if st_val in ("succeeded", SourceStatus.succeeded.value):
+                metrics.succeeded += 1
+            elif st_val in ("no_match", SourceStatus.no_match.value):
+                metrics.no_match += 1
+            elif st_val in ("rate_limited", SourceStatus.rate_limited.value):
+                metrics.rate_limited += 1
+            elif st_val in ("blocked", SourceStatus.blocked.value):
+                metrics.blocked += 1
+            elif st_val in ("unavailable", SourceStatus.unavailable.value):
+                metrics.unavailable += 1
+            elif st_val in ("skipped", SourceStatus.skipped.value):
+                metrics.skipped += 1
+            else:
+                metrics.error += 1
+
+        return metrics
+
     async def run_investigation(
         self, request: InvestigationRequest | dict[str, Any]
     ) -> InvestigationResponse:
@@ -251,21 +323,22 @@ class InvestigationOrchestrator:
                 self.settings.max_runtime,
             )
 
-            try:
-                results = await asyncio.wait_for(
-                    self.scheduler.execute_tasks(tasks),
-                    timeout=max_runtime,
-                )
-            except TimeoutError:
-                warnings.append(f"Investigation hit global runtime limit of {max_runtime}s.")
-                results = []
-
-            for mod_id, findings, status_str in results:
+            def _on_module_result(
+                mod_id: str, findings: list[dict[str, Any]], status_str: str
+            ) -> None:
                 module_statuses[mod_id] = status_str
                 for f in findings:
                     if "investigation_id" not in f or not f["investigation_id"]:
                         f["investigation_id"] = inv_id
                     all_findings.append(f)
+
+            try:
+                await asyncio.wait_for(
+                    self.scheduler.execute_tasks(tasks, on_result=_on_module_result),
+                    timeout=max_runtime,
+                )
+            except TimeoutError:
+                warnings.append(f"Investigation hit global runtime limit of {max_runtime}s.")
 
             # Deduplicate findings
             deduped = deduplicate_findings(all_findings)
@@ -297,56 +370,15 @@ class InvestigationOrchestrator:
                 st = str(f.get("status", "unknown"))
                 by_status[st] = by_status.get(st, 0) + 1
 
-            # Compute SourceMetrics
-            metrics = SourceMetrics(
-                registered=len(self.registry.list_all()),
-                eligible=len(module_pairs),
-                attempted=len(module_statuses),
-            )
-            for mod_id, status_str in module_statuses.items():
-                mod_findings = [
-                    f
-                    for f in all_findings
-                    if f.get("module_id") == mod_id or f.get("source_id") == mod_id
-                ]
-                if mod_findings:
-                    st_val = mod_findings[0].get("source_status")
-                    if not st_val:
-                        if any(f.get("status") in ["found", "info"] for f in mod_findings):
-                            st_val = SourceStatus.succeeded
-                        else:
-                            st_val = SourceStatus.no_match
-
-                    if st_val in (SourceStatus.succeeded, "succeeded"):
-                        metrics.succeeded += 1
-                    elif st_val in (SourceStatus.no_match, "no_match"):
-                        metrics.no_match += 1
-                    elif st_val in (SourceStatus.rate_limited, "rate_limited"):
-                        metrics.rate_limited += 1
-                    elif st_val in (SourceStatus.blocked, "blocked"):
-                        metrics.blocked += 1
-                    elif st_val in (SourceStatus.unavailable, "unavailable"):
-                        metrics.unavailable += 1
-                    elif st_val in (SourceStatus.skipped, "skipped"):
-                        metrics.skipped += 1
-                    else:
-                        metrics.error += 1
-                else:
-                    if status_str == "timeout":
-                        metrics.unavailable += 1
-                    elif status_str == "error":
-                        metrics.error += 1
-                    elif status_str == "skipped":
-                        metrics.skipped += 1
-                    else:
-                        metrics.no_match += 1
+            # Compute SourceMetrics honestly
+            metrics = self._calculate_metrics(module_pairs, module_statuses, all_findings)
 
             duration = round(time.perf_counter() - start_time, 3)
 
             # Determine overall investigation status
             if not module_statuses:
                 final_status = (
-                    InvestigationStatus.completed if not results else InvestigationStatus.failed
+                    InvestigationStatus.completed if not tasks else InvestigationStatus.failed
                 )
             elif all(s == "completed" for s in module_statuses.values()):
                 final_status = InvestigationStatus.completed
@@ -396,25 +428,47 @@ class InvestigationOrchestrator:
         except asyncio.CancelledError:
             logger.info("Investigation %s was cancelled", inv_id)
             duration = round(time.perf_counter() - start_time, 3)
+            deduped = deduplicate_findings(all_findings)
+            raw_entities = extract_entities(deduped)
+            raw_edges = build_edges(raw_entities, deduped)
+            entities_schemas = [
+                EntitySchema(id=e.id, type=e.type, value=e.value, display_label=e.display_label)
+                for e in raw_entities
+            ]
+            edges_schemas = [
+                EdgeSchema(
+                    source_entity_id=ed.source_entity_id,
+                    dest_entity_id=ed.dest_entity_id,
+                    relation=ed.relation,
+                    basis=ed.basis,
+                    confidence=ed.confidence,  # type: ignore[arg-type]
+                    evidence_ids=ed.evidence_ids,
+                    label=ed.label,
+                )
+                for ed in raw_edges
+            ]
+            by_status = {}
+            for f in deduped:
+                st = str(f.get("status", "unknown"))
+                by_status[st] = by_status.get(st, 0) + 1
+
+            metrics = self._calculate_metrics(module_pairs, module_statuses, all_findings)
+
             cancelled_resp = InvestigationResponse(
                 id=inv_id,
                 status=InvestigationStatus.cancelled,
                 created_at=created_at,
                 completed_at=datetime.now(UTC),
                 request=req.model_dump(exclude_none=True),
-                findings=deduplicate_findings(all_findings),  # type: ignore[arg-type]
-                entities=[],
-                edges=[],
+                findings=deduped,  # type: ignore[arg-type]
+                entities=entities_schemas,
+                edges=edges_schemas,
                 summary=SummarySchema(
-                    total=len(all_findings),
-                    by_status={},
+                    total=len(deduped),
+                    by_status=by_status,
                     duration_seconds=duration,
                     module_statuses=module_statuses,
-                    metrics=SourceMetrics(
-                        registered=len(self.registry.list_all()),
-                        eligible=len(module_pairs),
-                        attempted=len(module_statuses),
-                    ),
+                    metrics=metrics,
                 ),
                 warnings=warnings + ["Investigation was cancelled by user request."],
                 cancellation_reason="Cancelled by user request.",
